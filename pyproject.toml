@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "token-badge"
+version = "0.1.0"
+description = "Badge tiering for subscription-based AI agent token usage, starting with Codex ccusage."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+  { name = "Token Badge Contributors" }
+]
+dependencies = []
+
+[project.scripts]
+token-badge = "token_badge.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
