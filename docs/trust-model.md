@@ -23,7 +23,9 @@ The product should therefore display a trust level with every grant.
 - Never accept manual token totals from the browser.
 - Generate a local collector installation ID and keypair during enrollment.
 - Require a fresh server challenge for every usage submission.
-- Sign the canonicalized `ccusage` summary, nonce, collector ID, and timestamp.
+- Hash the canonicalized `ccusage` summary, nonce, collector ID, and GitHub login
+  before submitting it.
+- Sign the report hash once collector key management exists.
 - Store hashes of accepted summaries so later submissions can be compared.
 - Require totals to be monotonic unless the user explicitly starts a new provider
   identity.
@@ -49,4 +51,3 @@ The first mode is safer for MVP because it avoids write access to GitHub reposit
 When a provider exposes server-side usage APIs or signed exports, store the provider
 subject ID and signed receipt alongside the local collector identity. The badge grant
 rule can stay the same; only the evidence trust level changes.
-

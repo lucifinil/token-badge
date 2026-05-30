@@ -46,6 +46,16 @@ Run the Codex collector directly from the checkout:
 PYTHONPATH=src python3 -m token_badge.cli codex --github <github-login> --json
 ```
 
+Bind a Codex report to a server-issued collection challenge:
+
+```bash
+PYTHONPATH=src python3 -m token_badge.cli codex \
+  --github <github-login> \
+  --collector-id <collector-installation-id> \
+  --challenge <server-nonce> \
+  --json
+```
+
 List configured tiers:
 
 ```bash
