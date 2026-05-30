@@ -3,6 +3,7 @@
 ## Milestone 0: Local Codex Prototype
 
 - Define badge thresholds.
+- Check local collector dependencies before usage collection.
 - Run `ccusage codex monthly --json`.
 - Normalize `totals.totalTokens`.
 - Return the earned tier for a GitHub login hint.
@@ -35,4 +36,3 @@
 - Keep subscription usage separate from API usage.
 - Support provider-verified receipts when available.
 - Add per-provider and combined-subscription badge scopes.
-

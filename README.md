@@ -40,6 +40,24 @@ export.
 
 ## Local Prototype
 
+Install local collector dependencies:
+
+```bash
+npm install -g ccusage
+```
+
+Current local collector dependencies are:
+
+- Python 3.11 or newer.
+- Node.js/npm for installing or upgrading `ccusage`.
+- `ccusage` with Codex command support.
+
+Check readiness before collecting usage:
+
+```bash
+PYTHONPATH=src python3 -m token_badge.cli doctor
+```
+
 Run the Codex collector directly from the checkout:
 
 ```bash
