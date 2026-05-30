@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from token_badge.ccusage import CcusageError, collect_codex_usage
+from token_badge.evidence import build_usage_evidence, evidence_summary
 from token_badge.tiers import DEFAULT_TIERS, earned_tier, next_tier
 
 
@@ -46,15 +47,34 @@ def run_codex(args: argparse.Namespace) -> int:
         print(f"error: {exc}")
         return 1
 
+    trust_level = "local-self-reported"
+    collector_installation_id = args.collector_id or args.subject
+    evidence = None
+    if args.challenge:
+        evidence_payload = build_usage_evidence(
+            provider=snapshot.provider,
+            usage_kind=snapshot.usage_kind,
+            source=snapshot.source,
+            trust_level=trust_level,
+            total_tokens=snapshot.total_tokens,
+            challenge_nonce=args.challenge,
+            collector_installation_id=collector_installation_id,
+            github_login=args.github,
+            raw_totals=snapshot.raw_totals,
+        )
+        evidence = evidence_summary(evidence_payload)
+
     payload = {
         "as_of": datetime.now(UTC).isoformat(),
         "provider": snapshot.provider,
         "usage_kind": snapshot.usage_kind,
         "source": snapshot.source,
-        "trust_level": "local-self-reported",
+        "trust_level": trust_level,
         "github_login": args.github,
         "collector_subject_hint": args.subject,
+        "collector_installation_id": collector_installation_id,
         "total_tokens": snapshot.total_tokens,
+        "evidence": evidence,
         "tiers": _tier_payload(snapshot.total_tokens),
         "raw_totals": snapshot.raw_totals if args.include_raw_totals else None,
     }
@@ -71,6 +91,9 @@ def run_codex(args: argparse.Namespace) -> int:
     print(f"Trust level: {payload['trust_level']}")
     if args.github:
         print(f"GitHub: {args.github}")
+    if evidence:
+        print(f"Challenge: {evidence['challenge_nonce']}")
+        print(f"Report hash: {evidence['report_hash']}")
     print(f"Earned badge: {earned['name'] if earned else 'None yet'}")
     if next_badge:
         print(
@@ -112,6 +135,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--subject",
         help="Optional local collector subject hint; server enrollment should create the real ID",
     )
+    codex.add_argument(
+        "--collector-id",
+        help="Collector installation ID issued during enrollment; falls back to --subject for the prototype",
+    )
+    codex.add_argument(
+        "--challenge",
+        help="Server-issued challenge nonce to bind the local usage report to a collection attempt",
+    )
     codex.add_argument("--since", help="Start date passed to ccusage, YYYY-MM-DD or YYYYMMDD")
     codex.add_argument("--until", help="End date passed to ccusage, inclusive")
     codex.add_argument("--timezone", help="IANA timezone passed to ccusage")
@@ -139,4 +170,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
