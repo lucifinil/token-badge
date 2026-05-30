@@ -20,6 +20,7 @@
 ## Milestone 2: Badge Service
 
 - Persist members, provider identities, snapshots, tiers, and grants.
+- Accept challenge-bound usage snapshot uploads into TiDB.
 - Serve public badge SVGs.
 - Serve public evidence pages with provider, total, timestamp, and trust level.
 - Add a private dashboard for refreshing usage.
