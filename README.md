@@ -52,6 +52,12 @@ List configured tiers:
 PYTHONPATH=src python3 -m token_badge.cli tiers
 ```
 
+Run tests:
+
+```bash
+PYTHONPATH=src python3 -m unittest
+```
+
 ## Repository Map
 
 - `src/token_badge/`: small collector and tiering prototype.
