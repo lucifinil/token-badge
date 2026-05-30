@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from token_badge.ccusage import CcusageError, collect_codex_usage
+from token_badge.dependencies import collect_dependency_checks, required_checks_pass
 from token_badge.evidence import build_usage_evidence, evidence_summary
 from token_badge.tiers import DEFAULT_TIERS, earned_tier, next_tier
 
@@ -122,6 +123,27 @@ def run_tiers(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_doctor(args: argparse.Namespace) -> int:
+    checks = collect_dependency_checks()
+    payload = {
+        "ok": required_checks_pass(checks),
+        "checks": [check.to_dict() for check in checks],
+    }
+    if args.json:
+        _print_json(payload)
+        return 0 if payload["ok"] else 1
+
+    print("Token Badge dependency check")
+    for check in checks:
+        marker = "ok" if check.ok else check.status
+        requirement = "required" if check.required else "optional"
+        print(f"- {check.name}: {marker} ({requirement})")
+        print(f"  {check.detail}")
+        if check.remediation:
+            print(f"  fix: {check.remediation}")
+    return 0 if payload["ok"] else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="token-badge",
@@ -158,6 +180,10 @@ def build_parser() -> argparse.ArgumentParser:
     tiers = subcommands.add_parser("tiers", help="Show badge tiers")
     tiers.add_argument("--json", action="store_true", help="Emit JSON")
     tiers.set_defaults(func=run_tiers)
+
+    doctor = subcommands.add_parser("doctor", help="Check local collector dependencies")
+    doctor.add_argument("--json", action="store_true", help="Emit JSON")
+    doctor.set_defaults(func=run_doctor)
 
     return parser
 

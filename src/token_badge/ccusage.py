@@ -6,6 +6,8 @@ import subprocess
 from dataclasses import dataclass
 from typing import Any
 
+from token_badge.dependencies import CCUSAGE_INSTALL_GUIDANCE
+
 
 class CcusageError(RuntimeError):
     """Raised when ccusage cannot produce a usable Codex usage report."""
@@ -30,7 +32,7 @@ def load_codex_monthly_report(
 ) -> dict[str, Any]:
     """Run ccusage's Codex monthly report in JSON mode."""
     if not shutil.which("ccusage"):
-        raise CcusageError("ccusage is not installed or is not on PATH")
+        raise CcusageError(f"ccusage is not installed or is not on PATH. {CCUSAGE_INSTALL_GUIDANCE}")
 
     command = ["ccusage", "codex", "monthly", "--json"]
     if since:
@@ -94,4 +96,3 @@ def collect_codex_usage(**kwargs: Any) -> CodexUsageSnapshot:
         total_tokens=total_tokens_from_report(report),
         raw_totals=totals,
     )
-
