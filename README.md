@@ -91,5 +91,6 @@ PYTHONPATH=src python3 -m unittest
 - `src/token_badge/`: small collector and tiering prototype.
 - `docs/product-brief.md`: product framing and first user experience.
 - `docs/data-model.md`: identity, usage, and badge grant model.
+- `docs/deployment.md`: TiDB-backed upload API setup and metadata boundary.
 - `docs/trust-model.md`: anti-fooling model and its limits.
 - `docs/roadmap.md`: build sequence from local prototype to badge service.

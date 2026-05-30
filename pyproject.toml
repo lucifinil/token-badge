@@ -12,11 +12,12 @@ license = { text = "MIT" }
 authors = [
   { name = "Token Badge Contributors" }
 ]
-dependencies = []
+dependencies = [
+  "PyMySQL>=1.1",
+]
 
 [project.scripts]
 token-badge = "token_badge.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-

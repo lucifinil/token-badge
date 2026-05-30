@@ -6,9 +6,12 @@ from datetime import UTC, datetime
 from typing import Any
 
 from token_badge.ccusage import CcusageError, collect_codex_usage
+from token_badge.api import TokenBadgeAPI, run_http_server
 from token_badge.dependencies import collect_dependency_checks, required_checks_pass
 from token_badge.evidence import build_usage_evidence, evidence_summary
+from token_badge.storage import StorageConfigurationError, StorageError, TiDBStorage
 from token_badge.tiers import DEFAULT_TIERS, earned_tier, next_tier
+from token_badge.upload import UploadError, request_challenge, upload_usage_snapshot
 
 
 def _tier_payload(total_tokens: int) -> dict[str, Any]:
@@ -37,6 +40,28 @@ def _print_json(payload: dict[str, Any]) -> None:
 
 
 def run_codex(args: argparse.Namespace) -> int:
+    collector_installation_id = args.collector_id or args.subject
+    challenge_nonce = args.challenge
+    if args.upload_url and not collector_installation_id:
+        print("error: --collector-id is required when --upload-url is used")
+        return 1
+
+    if args.upload_url and not challenge_nonce:
+        try:
+            challenge = request_challenge(
+                args.upload_url,
+                collector_installation_id=collector_installation_id,
+                github_login=args.github,
+                github_node_id=args.github_node_id,
+            )
+        except UploadError as exc:
+            print(f"error: {exc}")
+            return 1
+        challenge_nonce = challenge.get("challenge_nonce")
+        if not isinstance(challenge_nonce, str) or not challenge_nonce:
+            print("error: upload endpoint did not return a challenge_nonce")
+            return 1
+
     try:
         snapshot = collect_codex_usage(
             since=args.since,
@@ -49,21 +74,44 @@ def run_codex(args: argparse.Namespace) -> int:
         return 1
 
     trust_level = "local-self-reported"
-    collector_installation_id = args.collector_id or args.subject
     evidence = None
-    if args.challenge:
+    upload = None
+    if challenge_nonce:
         evidence_payload = build_usage_evidence(
             provider=snapshot.provider,
             usage_kind=snapshot.usage_kind,
             source=snapshot.source,
             trust_level=trust_level,
             total_tokens=snapshot.total_tokens,
-            challenge_nonce=args.challenge,
+            challenge_nonce=challenge_nonce,
             collector_installation_id=collector_installation_id,
             github_login=args.github,
             raw_totals=snapshot.raw_totals,
         )
         evidence = evidence_summary(evidence_payload)
+
+    if args.upload_url:
+        if evidence is None:
+            print("error: usage upload requires a challenge-bound evidence hash")
+            return 1
+        upload_payload = {
+            "challenge_nonce": evidence["challenge_nonce"],
+            "collector_installation_id": collector_installation_id,
+            "github_login": args.github,
+            "github_node_id": args.github_node_id,
+            "provider": snapshot.provider,
+            "raw_totals": snapshot.raw_totals,
+            "report_hash": evidence["report_hash"],
+            "source": snapshot.source,
+            "total_tokens": snapshot.total_tokens,
+            "trust_level": trust_level,
+            "usage_kind": snapshot.usage_kind,
+        }
+        try:
+            upload = upload_usage_snapshot(args.upload_url, upload_payload)
+        except UploadError as exc:
+            print(f"error: {exc}")
+            return 1
 
     payload = {
         "as_of": datetime.now(UTC).isoformat(),
@@ -76,6 +124,7 @@ def run_codex(args: argparse.Namespace) -> int:
         "collector_installation_id": collector_installation_id,
         "total_tokens": snapshot.total_tokens,
         "evidence": evidence,
+        "upload": upload,
         "tiers": _tier_payload(snapshot.total_tokens),
         "raw_totals": snapshot.raw_totals if args.include_raw_totals else None,
     }
@@ -95,6 +144,8 @@ def run_codex(args: argparse.Namespace) -> int:
     if evidence:
         print(f"Challenge: {evidence['challenge_nonce']}")
         print(f"Report hash: {evidence['report_hash']}")
+    if upload:
+        print(f"Upload: {upload['status']} ({upload['snapshot_id']})")
     print(f"Earned badge: {earned['name'] if earned else 'None yet'}")
     if next_badge:
         print(
@@ -144,6 +195,27 @@ def run_doctor(args: argparse.Namespace) -> int:
     return 0 if payload["ok"] else 1
 
 
+def run_init_db(args: argparse.Namespace) -> int:
+    try:
+        storage = TiDBStorage.from_env()
+        storage.initialize_schema()
+    except (StorageConfigurationError, StorageError) as exc:
+        print(f"error: {exc}")
+        return 1
+    print("TiDB schema is ready")
+    return 0
+
+
+def run_serve(args: argparse.Namespace) -> int:
+    try:
+        storage = TiDBStorage.from_env()
+    except StorageConfigurationError as exc:
+        print(f"error: {exc}")
+        return 1
+    run_http_server(TokenBadgeAPI(storage), host=args.host, port=args.port)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="token-badge",
@@ -153,6 +225,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     codex = subcommands.add_parser("codex", help="Collect Codex subscription usage via ccusage")
     codex.add_argument("--github", help="GitHub login to include in the local report")
+    codex.add_argument("--github-node-id", help="Stable GitHub node_id from backend enrollment")
     codex.add_argument(
         "--subject",
         help="Optional local collector subject hint; server enrollment should create the real ID",
@@ -164,6 +237,10 @@ def build_parser() -> argparse.ArgumentParser:
     codex.add_argument(
         "--challenge",
         help="Server-issued challenge nonce to bind the local usage report to a collection attempt",
+    )
+    codex.add_argument(
+        "--upload-url",
+        help="Backend base URL; when set, request a challenge if needed and upload minimal usage metadata",
     )
     codex.add_argument("--since", help="Start date passed to ccusage, YYYY-MM-DD or YYYYMMDD")
     codex.add_argument("--until", help="End date passed to ccusage, inclusive")
@@ -184,6 +261,14 @@ def build_parser() -> argparse.ArgumentParser:
     doctor = subcommands.add_parser("doctor", help="Check local collector dependencies")
     doctor.add_argument("--json", action="store_true", help="Emit JSON")
     doctor.set_defaults(func=run_doctor)
+
+    init_db = subcommands.add_parser("init-db", help="Create or update the TiDB schema")
+    init_db.set_defaults(func=run_init_db)
+
+    serve = subcommands.add_parser("serve", help="Run the Token Badge upload API")
+    serve.add_argument("--host", default="127.0.0.1")
+    serve.add_argument("--port", type=int, default=8000)
+    serve.set_defaults(func=run_serve)
 
     return parser
 
