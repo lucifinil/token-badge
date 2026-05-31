@@ -28,7 +28,8 @@
 ## Milestone 3: GitHub Publication
 
 - Add copyable profile README Markdown.
-- Optionally add a GitHub app for profile README or gist updates.
+- Add a local GitHub profile README updater that uses the existing `gh` connection.
+- Fall back to GitHub SSO/OAuth only when no usable local connection exists.
 - Refresh badge assets when a higher tier is granted.
 
 ## Milestone 4: Provider Expansion

@@ -16,7 +16,8 @@ identity for coding-agent usage.
 3. User runs the command on the machine where Codex usage is available.
 4. The collector reads `ccusage codex monthly --json` or `ccusage claude monthly --json`.
 5. Token Badge records the provider total and grants from the user's highest provider total.
-6. User can publish a badge URL or have a GitHub app update their profile README.
+6. Token Badge can install the dynamic badge link in the user's profile README through
+   the connected local GitHub session.
 
 ## Initial Badge Ladder
 
@@ -42,4 +43,5 @@ identity for coding-agent usage.
 - Pricing or cost leaderboard.
 - Team or organization badges.
 - API token usage.
-- Direct mutation of a user's GitHub profile without explicit GitHub app consent.
+- Native GitHub achievement badges.
+- Direct mutation of a user's GitHub profile without an authenticated GitHub session.

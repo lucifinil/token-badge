@@ -45,6 +45,12 @@ curl http://localhost:8000/v1/badges/<github-login>
 curl http://localhost:8000/v1/badges/<github-login>.svg
 ```
 
+Configure the public URL used in profile README badges:
+
+```bash
+export TOKEN_BADGE_PUBLIC_URL='https://token-badge.example.com'
+```
+
 ## Collector Upload
 
 Users can upload Codex usage metadata directly from the collector:
@@ -55,10 +61,13 @@ token-badge codex \
   --github-node-id <github-node-id> \
   --collector-id <collector-installation-id> \
   --upload-url https://token-badge.example.com \
+  --profile-badge \
   --json
 ```
 
 If `--challenge` is omitted, the collector asks the backend for a fresh challenge first.
+If `--profile-badge` is present, the collector updates the authenticated GitHub user's
+profile README after the upload is accepted.
 
 Claude Code uses the same upload path:
 
@@ -68,8 +77,29 @@ token-badge claude \
   --github-node-id <github-node-id> \
   --collector-id <collector-installation-id> \
   --upload-url https://token-badge.example.com \
+  --profile-badge \
   --json
 ```
+
+## GitHub Profile Badge
+
+After a badge grant exists, install or refresh the dynamic SVG link in the authenticated
+user's GitHub profile README:
+
+```bash
+token-badge profile-badge
+```
+
+The command uses the existing local GitHub connection through `gh`, reads the special
+`<github-login>/<github-login>` profile repository, and replaces only the bounded Token
+Badge marker block. Use `--dry-run` before committing:
+
+```bash
+token-badge profile-badge --dry-run
+```
+
+If `gh` is not authenticated or cannot write the profile repository, ask the user whether
+they want to proceed with GitHub SSO/OAuth.
 
 ## Stored Metadata
 

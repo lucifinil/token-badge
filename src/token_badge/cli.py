@@ -9,6 +9,7 @@ from token_badge.ccusage import CcusageError, collect_provider_usage
 from token_badge.api import TokenBadgeAPI, run_http_server
 from token_badge.dependencies import collect_dependency_checks, required_checks_pass
 from token_badge.evidence import build_usage_evidence, evidence_summary
+from token_badge.github_profile import GitHubProfileClient, GitHubProfileError, badge_base_url_from_env
 from token_badge.storage import StorageConfigurationError, StorageError, TiDBStorage
 from token_badge.tiers import DEFAULT_TIERS, earned_tier, next_tier
 from token_badge.upload import UploadError, request_challenge, upload_usage_snapshot
@@ -40,6 +41,26 @@ def _print_json(payload: dict[str, Any]) -> None:
 
 
 def run_usage_provider(args: argparse.Namespace, provider: str) -> int:
+    profile_client = None
+    if args.profile_badge:
+        if not args.upload_url:
+            print("error: --profile-badge requires --upload-url so a backend grant can be accepted first")
+            return 1
+        profile_client = GitHubProfileClient()
+        try:
+            authenticated_login = profile_client.authenticated_login()
+        except GitHubProfileError as exc:
+            print(f"error: {exc}")
+            return 1
+        if not args.github:
+            args.github = authenticated_login
+        elif args.github.lower() != authenticated_login.lower():
+            print(
+                "error: --profile-badge can only update the authenticated GitHub profile "
+                f"({authenticated_login})"
+            )
+            return 1
+
     collector_installation_id = args.collector_id or args.subject
     challenge_nonce = args.challenge
     if args.upload_url and not collector_installation_id:
@@ -114,6 +135,26 @@ def run_usage_provider(args: argparse.Namespace, provider: str) -> int:
             print(f"error: {exc}")
             return 1
 
+    profile_badge = None
+    if args.profile_badge:
+        badge_base_url = args.badge_base_url or badge_base_url_from_env() or args.upload_url
+        try:
+            update = profile_client.install_badge(
+                github_login=args.github,
+                badge_base_url=badge_base_url,
+                dry_run=False,
+                message=args.profile_badge_message,
+            )
+        except GitHubProfileError as exc:
+            print(f"error: {exc}")
+            return 1
+        profile_badge = {
+            "github_login": update.github_login,
+            "repository": update.repository,
+            "changed": update.changed,
+            "commit_sha": update.commit_sha,
+        }
+
     payload = {
         "as_of": datetime.now(UTC).isoformat(),
         "provider": snapshot.provider,
@@ -126,6 +167,7 @@ def run_usage_provider(args: argparse.Namespace, provider: str) -> int:
         "total_tokens": snapshot.total_tokens,
         "evidence": evidence,
         "upload": upload,
+        "profile_badge": profile_badge,
         "tiers": _tier_payload(snapshot.total_tokens),
         "raw_totals": snapshot.raw_totals if args.include_raw_totals else None,
     }
@@ -147,6 +189,9 @@ def run_usage_provider(args: argparse.Namespace, provider: str) -> int:
         print(f"Report hash: {evidence['report_hash']}")
     if upload:
         print(f"Upload: {upload['status']} ({upload['snapshot_id']})")
+    if profile_badge:
+        action = "updated" if profile_badge["changed"] else "already up to date"
+        print(f"Profile badge: {action} ({profile_badge['repository']})")
     print(f"Earned badge: {earned['name'] if earned else 'None yet'}")
     if next_badge:
         print(
@@ -225,6 +270,49 @@ def run_serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_profile_badge(args: argparse.Namespace) -> int:
+    badge_base_url = args.badge_base_url or badge_base_url_from_env()
+    if not badge_base_url:
+        print("error: --badge-base-url or TOKEN_BADGE_PUBLIC_URL is required")
+        return 1
+
+    try:
+        update = GitHubProfileClient().install_badge(
+            github_login=args.github,
+            badge_base_url=badge_base_url,
+            dry_run=args.dry_run,
+            message=args.message,
+            branch=args.branch,
+        )
+    except GitHubProfileError as exc:
+        print(f"error: {exc}")
+        return 1
+
+    payload = {
+        "github_login": update.github_login,
+        "repository": update.repository,
+        "changed": update.changed,
+        "dry_run": update.dry_run,
+        "commit_sha": update.commit_sha,
+    }
+    if args.dry_run:
+        payload["readme"] = update.content
+
+    if args.json:
+        _print_json(payload)
+        return 0
+
+    action = "would update" if args.dry_run and update.changed else "updated"
+    if not update.changed:
+        action = "already up to date"
+    print(f"GitHub: {update.github_login}")
+    print(f"Repository: {update.repository}")
+    print(f"Profile README: {action}")
+    if update.commit_sha:
+        print(f"Commit: {update.commit_sha}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="token-badge",
@@ -254,6 +342,20 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("--since", help="Start date passed to ccusage, YYYY-MM-DD or YYYYMMDD")
         command.add_argument("--until", help="End date passed to ccusage, inclusive")
         command.add_argument("--timezone", help="IANA timezone passed to ccusage")
+        command.add_argument(
+            "--profile-badge",
+            action="store_true",
+            help="After a successful upload, install or refresh the badge in the authenticated GitHub profile README",
+        )
+        command.add_argument(
+            "--profile-badge-message",
+            default="Add Token Badge profile badge",
+            help="Commit message for --profile-badge",
+        )
+        command.add_argument(
+            "--badge-base-url",
+            help="Public badge URL for --profile-badge; defaults to TOKEN_BADGE_PUBLIC_URL or --upload-url",
+        )
         command.add_argument("--include-raw-totals", action="store_true")
         command.add_argument("--json", action="store_true", help="Emit JSON")
 
@@ -285,6 +387,22 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8000)
     serve.set_defaults(func=run_serve)
+
+    profile_badge = subcommands.add_parser("profile-badge", help="Install the badge link in a GitHub profile README")
+    profile_badge.add_argument("--github", help="GitHub login; defaults to the authenticated local GitHub user")
+    profile_badge.add_argument(
+        "--badge-base-url",
+        help="Public Token Badge service URL; defaults to TOKEN_BADGE_PUBLIC_URL",
+    )
+    profile_badge.add_argument(
+        "--message",
+        default="Add Token Badge profile badge",
+        help="Commit message for the profile README update",
+    )
+    profile_badge.add_argument("--branch", help="Optional target branch; defaults to the profile repository default")
+    profile_badge.add_argument("--dry-run", action="store_true", help="Show the planned README content without committing")
+    profile_badge.add_argument("--json", action="store_true", help="Emit JSON")
+    profile_badge.set_defaults(func=run_profile_badge)
 
     return parser
 
