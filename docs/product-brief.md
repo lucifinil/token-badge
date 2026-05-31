@@ -23,9 +23,9 @@ identity for coding-agent usage.
 | Threshold | Badge |
 | ---: | --- |
 | 100 million tokens | Hot AI Prospect |
-| 500 million tokens | Wonder AI Kid |
-| 1 billion tokens | Key AI Player |
-| 10 billion tokens | World-Class AI Player |
+| 1 billion tokens | Wonder AI Kid |
+| 10 billion tokens | Key AI Player |
+| 100 billion tokens | World-Class AI Player |
 
 ## Product Principles
 

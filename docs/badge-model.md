@@ -39,21 +39,19 @@ higher future upload from any accepted provider can replace it.
 
 ## Tier Ladder
 
-The original 100M / 1B / 10B / 100B ladder had a clean order of magnitude shape, but it
-left too much dead space between early serious usage and the billion-token mark. For an
-MVP with Codex and Claude Code already showing real local totals around 100M to 1B+, a
-500M middle tier makes the badge progression more visible without making the top badge
-cheap.
+The tier ladder intentionally uses sparse order-of-magnitude thresholds. That keeps each
+promotion meaningful and avoids making the public badge feel like a frequent progress
+counter.
 
 | Threshold | Badge | Rationale |
 | ---: | --- | --- |
 | 100,000,000 | Hot AI Prospect | First serious, badge-worthy usage. |
-| 500,000,000 | Wonder AI Kid | A meaningful middle step before the billion mark. |
-| 1,000,000,000 | Key AI Player | Heavy recurring user; strong public badge. |
-| 10,000,000,000 | World-Class AI Player | Top-tier usage, still more realistic than 100B for an MVP. |
+| 1,000,000,000 | Wonder AI Kid | Billion-token usage, strong enough to feel rare. |
+| 10,000,000,000 | Key AI Player | Heavy recurring user across subscription-agent workflows. |
+| 100,000,000,000 | World-Class AI Player | Hall-of-fame level usage. |
 
-The 100B threshold should stay reserved for a future hall-of-fame tier after real usage
-distribution data proves it is needed.
+The 100B tier is intentionally aspirational. It can remain sparse until real usage
+distribution data proves that another tier is needed above it.
 
 ## GitHub Profile Association
 

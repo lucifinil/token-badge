@@ -17,19 +17,19 @@ DEFAULT_TIERS: tuple[BadgeTier, ...] = (
         description="Crossed the first 100 million subscription-agent tokens.",
     ),
     BadgeTier(
-        threshold=500_000_000,
-        name="Wonder AI Kid",
-        description="Reached half a billion subscription-agent tokens.",
-    ),
-    BadgeTier(
         threshold=1_000_000_000,
-        name="Key AI Player",
+        name="Wonder AI Kid",
         description="Reached one billion subscription-agent tokens.",
     ),
     BadgeTier(
         threshold=10_000_000_000,
-        name="World-Class AI Player",
+        name="Key AI Player",
         description="Reached ten billion subscription-agent tokens.",
+    ),
+    BadgeTier(
+        threshold=100_000_000_000,
+        name="World-Class AI Player",
+        description="Reached one hundred billion subscription-agent tokens.",
     ),
 )
 

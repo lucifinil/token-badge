@@ -18,9 +18,9 @@ usage source.
 | Threshold | Badge |
 | ---: | --- |
 | 100,000,000 tokens | Hot AI Prospect |
-| 500,000,000 tokens | Wonder AI Kid |
-| 1,000,000,000 tokens | Key AI Player |
-| 10,000,000,000 tokens | World-Class AI Player |
+| 1,000,000,000 tokens | Wonder AI Kid |
+| 10,000,000,000 tokens | Key AI Player |
+| 100,000,000,000 tokens | World-Class AI Player |
 
 Tier names salute the old Championship Manager / Football Manager player-role ladder.
 The important invariant is that a public grant is based on the highest accepted

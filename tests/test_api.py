@@ -151,7 +151,7 @@ class APITest(unittest.TestCase):
         response = api.handle("GET", "/v1/badges/octocat")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.body["tier"]["name"], "Key AI Player")
+        self.assertEqual(response.body["tier"]["name"], "Wonder AI Kid")
         self.assertEqual(response.body["winning_provider"], "codex")
         self.assertEqual(response.body["winning_total_tokens"], 1_200_000_000)
 
@@ -159,8 +159,8 @@ class APITest(unittest.TestCase):
         storage = FakeStorage()
         api = TokenBadgeAPI(storage)
         snapshot = valid_snapshot()
-        snapshot["total_tokens"] = 600_000_000
-        snapshot["raw_totals"]["totalTokens"] = 600_000_000
+        snapshot["total_tokens"] = 1_200_000_000
+        snapshot["raw_totals"]["totalTokens"] = 1_200_000_000
 
         api.handle("POST", "/v1/usage-snapshots", snapshot)
         response = api.handle("GET", "/v1/badges/octocat.svg")

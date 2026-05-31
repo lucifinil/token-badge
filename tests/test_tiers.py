@@ -14,8 +14,8 @@ class BadgeTierTest(unittest.TestCase):
         self.assertEqual(earned_tier(100_000_000).name, "Hot AI Prospect")
 
     def test_uses_highest_earned_tier(self) -> None:
-        self.assertEqual(earned_tier(12_000_000_000).name, "World-Class AI Player")
-        self.assertIsNone(next_tier(12_000_000_000))
+        self.assertEqual(earned_tier(12_000_000_000).name, "Key AI Player")
+        self.assertEqual(next_tier(12_000_000_000).name, "World-Class AI Player")
 
     def test_no_next_tier_after_top_badge(self) -> None:
         self.assertEqual(earned_tier(100_000_000_000).name, "World-Class AI Player")
