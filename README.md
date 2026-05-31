@@ -4,6 +4,19 @@ Token Badge grants public profile badges for subscription-based AI agent token u
 The first provider target is Codex, using `ccusage codex monthly --json` as the local
 usage source.
 
+## Start From Your AI Agent
+
+Token Badge is a deployed service. Users do not run anything by hand — they give their
+coding agent (Claude Code or Codex) one statement:
+
+> **"Read https://&lt;your-token-badge-host&gt;/SKILL.md and follow the instructions to
+> install and configure Token Badge for Claude Code."**
+
+The service serves agent-followable instructions at `GET /SKILL.md`. The agent reads
+them, collects the user's usage locally via `ccusage`, uploads it, reports the badge
+tier and percentile, and — only with the user's consent — adds the badge to their GitHub
+profile. The canonical copy lives in [SKILL.md](SKILL.md).
+
 ## First Scope
 
 - Count subscription-based token consumption only.
@@ -26,6 +39,50 @@ Tier names salute the old Championship Manager / Football Manager player-role la
 The important invariant is that a public grant is based on the highest accepted
 provider total for the linked GitHub profile.
 
+## Consumption Percentile
+
+Every upload is ranked against all other adopters who have uploaded, so a user sees
+where their consumption lands in the community:
+
+- While the project is still in its first 100 uploads, early adopters get a celebratory
+  line instead of a noisy percentile:
+
+  ```text
+  Total consumption: 150,000,000 tokens (claude)
+  Badge tier: Hot AI Prospect
+  You're one of the first 100 AI adopters to upload — yay! Check back later for your percentile.
+  ```
+
+- Once more than 100 profiles have uploaded, the line becomes a percentile against
+  everyone else:
+
+  ```text
+  Total consumption: 12,400,000,000 tokens (codex)
+  Badge tier: Key AI Player
+  Your consumption has beat 87% of other AI adopters.
+  ```
+
+The percentile counts the share of *other* adopters whose highest accepted total is
+below yours. It is served from `GET /v1/rankings/<github-login>` and returned by the
+`start` quickstart described below.
+
+## Quickstart
+
+`start` is the one-statement entry point. It uploads your usage, prints your total
+consumption, badge tier, and percentile, then asks before touching your GitHub profile:
+
+```bash
+PYTHONPATH=src python3 -m token_badge.cli start \
+  --provider claude \
+  --collector-id <collector-installation-id> \
+  --upload-url https://token-badge.example.com
+```
+
+If you answer yes at the prompt, `start` creates the special `<login>/<login>` profile
+repository when it does not exist yet and installs the badge in its README. If you
+answer no, nothing is written to GitHub — your usage is still recorded. Add `--json` to
+get the summary without the prompt.
+
 ## MVP Flow
 
 1. User signs in with GitHub. The service stores the GitHub `node_id`, not just the
@@ -34,7 +91,8 @@ provider total for the linked GitHub profile.
 3. Local collector runs `ccusage codex monthly --json`, computes the total, attaches
    the challenge, and signs a usage snapshot with the user's collector key.
 4. Service records the snapshot as Codex subscription usage.
-5. Service grants the highest matching badge from the user's highest provider total.
+5. Service grants the highest matching badge from the user's highest provider total and
+   reports the user's consumption percentile against all other adopters.
 
 The first implementation is not provider-certified. It should label Codex `ccusage`
 snapshots as `local-self-reported` until Codex exposes a server-side usage API or signed

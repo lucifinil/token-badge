@@ -12,6 +12,7 @@ from token_badge.github_profile import (
     GitHubConnectionError,
     GitHubProfileClient,
     GitHubProfileError,
+    ProfileRepositoryNotFound,
     badge_block,
     badge_markdown,
     upsert_badge_block,
@@ -186,6 +187,62 @@ class GitHubProfileTest(unittest.TestCase):
         self.assertEqual(update.commit_sha, "commit-1")
         put_call = next(call for call in runner.calls if "--method" in call)
         self.assertFalse(any(field.startswith("sha=") for field in put_call))
+
+    def test_client_creates_missing_profile_repository_when_allowed(self) -> None:
+        runner = FakeRunner(
+            [
+                (("api", "/user"), json_response({"login": "octocat"})),
+                (("api", "/repos/octocat/octocat"), GitHubProfileError("HTTP 404 Not Found")),
+                (
+                    ("api", "--method", "POST", "/user/repos", "--raw-field", ANY, "--raw-field", ANY, "--field", ANY, "--field", ANY),
+                    json_response({"default_branch": "main"}),
+                ),
+                (("api", "/repos/octocat/octocat/contents/README.md"), readme_response("# octocat\n", sha="sha-1")),
+                (
+                    (
+                        "api",
+                        "--method",
+                        "PUT",
+                        "/repos/octocat/octocat/contents/README.md",
+                        "--raw-field",
+                        "message=Add badge",
+                        "--raw-field",
+                        ANY,
+                        "--raw-field",
+                        "sha=sha-1",
+                    ),
+                    json_response({"commit": {"sha": "commit-1"}}),
+                ),
+            ]
+        )
+
+        update = GitHubProfileClient(runner).install_badge(
+            github_login="octocat",
+            badge_base_url="https://token.example.com",
+            dry_run=False,
+            message="Add badge",
+            create_repo=True,
+        )
+
+        self.assertTrue(update.repo_created)
+        self.assertEqual(update.commit_sha, "commit-1")
+        self.assertTrue(any(call[:4] == ("api", "--method", "POST", "/user/repos") for call in runner.calls))
+
+    def test_client_does_not_create_repository_without_opt_in(self) -> None:
+        runner = FakeRunner(
+            [
+                (("api", "/user"), json_response({"login": "octocat"})),
+                (("api", "/repos/octocat/octocat"), GitHubProfileError("HTTP 404 Not Found")),
+            ]
+        )
+
+        with self.assertRaises(ProfileRepositoryNotFound):
+            GitHubProfileClient(runner).install_badge(
+                github_login="octocat",
+                badge_base_url="https://token.example.com",
+                dry_run=False,
+                message="Add badge",
+            )
 
     def test_client_refuses_to_update_a_different_github_login(self) -> None:
         runner = FakeRunner({("api", "/user"): json_response({"login": "octocat"})})

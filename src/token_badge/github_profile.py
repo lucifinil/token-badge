@@ -20,6 +20,10 @@ class GitHubConnectionError(GitHubProfileError):
     """Raised when no usable local GitHub connection is available."""
 
 
+class ProfileRepositoryNotFound(GitHubProfileError):
+    """Raised when the special <login>/<login> profile repository does not exist."""
+
+
 class CommandRunner(Protocol):
     def run(self, args: Sequence[str]) -> str:
         ...
@@ -50,6 +54,7 @@ class ProfileBadgeUpdate:
     dry_run: bool
     content: str
     commit_sha: str | None = None
+    repo_created: bool = False
 
 
 class GhCliRunner:
@@ -147,13 +152,39 @@ class GitHubProfileClient:
             payload = json.loads(self.runner.run(["api", endpoint]))
         except GitHubProfileError as exc:
             if _is_not_found_error(exc):
-                raise GitHubProfileError(
+                raise ProfileRepositoryNotFound(
                     f"Profile repository {github_login}/{github_login} was not found. "
                     "Create the special GitHub profile repository first."
                 ) from exc
             raise
         except json.JSONDecodeError as exc:
             raise GitHubProfileError("GitHub repository response was not valid JSON") from exc
+
+        default_branch = payload.get("default_branch")
+        if not isinstance(default_branch, str) or not default_branch:
+            default_branch = "main"
+        return ProfileRepository(owner=github_login, name=github_login, default_branch=default_branch)
+
+    def create_profile_repository(self, github_login: str) -> ProfileRepository:
+        """Create the special <login>/<login> profile repository for the authenticated user."""
+        args = [
+            "api",
+            "--method",
+            "POST",
+            "/user/repos",
+            "--raw-field",
+            f"name={github_login}",
+            "--raw-field",
+            "description=Token Badge profile",
+            "--field",
+            "auto_init=true",
+            "--field",
+            "private=false",
+        ]
+        try:
+            payload = json.loads(self.runner.run(args))
+        except json.JSONDecodeError as exc:
+            raise GitHubProfileError("GitHub repository creation response was not valid JSON") from exc
 
         default_branch = payload.get("default_branch")
         if not isinstance(default_branch, str) or not default_branch:
@@ -218,6 +249,7 @@ class GitHubProfileClient:
         dry_run: bool,
         message: str,
         branch: str | None = None,
+        create_repo: bool = False,
     ) -> ProfileBadgeUpdate:
         authenticated_login = self.authenticated_login()
         target_login = github_login or authenticated_login
@@ -226,7 +258,14 @@ class GitHubProfileClient:
                 f"authenticated GitHub user is {authenticated_login}, not {target_login}"
             )
 
-        repository = self.profile_repository(authenticated_login)
+        repo_created = False
+        try:
+            repository = self.profile_repository(authenticated_login)
+        except ProfileRepositoryNotFound:
+            if not create_repo or dry_run:
+                raise
+            repository = self.create_profile_repository(authenticated_login)
+            repo_created = True
         readme = self.get_readme(repository)
         updated_content, changed = upsert_badge_block(
             readme.content,
@@ -249,6 +288,7 @@ class GitHubProfileClient:
             dry_run=dry_run,
             content=updated_content,
             commit_sha=commit_sha,
+            repo_created=repo_created,
         )
 
 

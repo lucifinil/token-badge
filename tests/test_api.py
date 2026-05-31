@@ -4,7 +4,8 @@ import unittest
 from typing import Any
 
 from token_badge.api import TokenBadgeAPI, validate_usage_snapshot
-from token_badge.badges import badge_grant_from_snapshot, should_replace_badge_grant
+from token_badge.badges import badge_grant_from_snapshot, github_identity_key, should_replace_badge_grant
+from token_badge.rankings import ConsumptionRanking, compute_ranking
 
 
 class FakeStorage:
@@ -29,6 +30,15 @@ class FakeStorage:
 
     def get_badge_grant(self, github_login: str) -> dict[str, Any] | None:
         return self.grants.get(f"github_login:{github_login.lower()}")
+
+    def get_consumption_ranking(self, github_login: str) -> ConsumptionRanking:
+        totals: dict[str, int] = {}
+        for snapshot in self.snapshots:
+            key = github_identity_key(snapshot.get("github_login"), snapshot.get("github_node_id"))
+            if key is None:
+                continue
+            totals[key] = max(totals.get(key, 0), snapshot["total_tokens"])
+        return compute_ranking(totals, github_identity_key(github_login), threshold=2)
 
 
 class FailingStorage(FakeStorage):
@@ -168,6 +178,41 @@ class APITest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content_type, "image/svg+xml")
         self.assertIn("Wonder AI Kid", response.body)
+
+    def test_ranking_endpoint_reports_percentile_message(self) -> None:
+        storage = FakeStorage()
+        api = TokenBadgeAPI(storage)
+        for index, (login, total) in enumerate(
+            (("low", 100), ("mid", 200), ("octocat", 300)), start=1
+        ):
+            snapshot = valid_snapshot()
+            snapshot["github_login"] = login
+            snapshot["github_node_id"] = f"U_{index}"
+            snapshot["challenge_nonce"] = f"nonce-{index}"
+            snapshot["report_hash"] = "sha256:" + str(index) * 64
+            snapshot["total_tokens"] = total
+            api.handle("POST", "/v1/usage-snapshots", snapshot)
+
+        response = api.handle("GET", "/v1/rankings/octocat")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.body["github_login"], "octocat")
+        self.assertFalse(response.body["is_early_adopter"])
+        self.assertEqual(response.body["percentile"], 100.0)
+        self.assertIn("beat 100% of other AI adopters", response.body["message"])
+
+    def test_ranking_endpoint_celebrates_early_adopters(self) -> None:
+        storage = FakeStorage()
+        api = TokenBadgeAPI(storage)
+        snapshot = valid_snapshot()
+        api.handle("POST", "/v1/usage-snapshots", snapshot)
+
+        response = api.handle("GET", "/v1/rankings/octocat")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.body["is_early_adopter"])
+        self.assertIsNone(response.body["percentile"])
+        self.assertIn("one of the first", response.body["message"])
 
     def test_validate_snapshot_rejects_nested_raw_totals(self) -> None:
         payload = valid_snapshot()
