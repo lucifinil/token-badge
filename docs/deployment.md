@@ -53,6 +53,17 @@ token-badge codex \
 
 If `--challenge` is omitted, the collector asks the backend for a fresh challenge first.
 
+Claude Code uses the same upload path:
+
+```bash
+token-badge claude \
+  --github <github-login> \
+  --github-node-id <github-node-id> \
+  --collector-id <collector-installation-id> \
+  --upload-url https://token-badge.example.com \
+  --json
+```
+
 ## Stored Metadata
 
 The backend accepts and stores only:
@@ -70,6 +81,5 @@ The backend accepts and stores only:
 - summarized `raw_totals`
 
 The API rejects full `ccusage` reports, monthly/session rows, model breakdowns, prompts,
-messages, file paths, and other logs. The current provider accepted by the backend is
-`codex`; future provider adapters are tracked separately.
-
+messages, file paths, and other logs. The current providers accepted by the backend are
+`codex` and `claude`; future provider adapters are tracked separately.

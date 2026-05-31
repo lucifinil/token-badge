@@ -5,6 +5,7 @@ import unittest
 from token_badge.dependencies import (
     CCUSAGE_INSTALL_COMMAND,
     check_ccusage,
+    check_ccusage_claude_support,
     check_ccusage_codex_support,
     collect_dependency_checks,
     required_checks_pass,
@@ -30,6 +31,13 @@ class DependencyCheckTest(unittest.TestCase):
         self.assertIn("ccusage is missing", check.detail)
         self.assertIn(CCUSAGE_INSTALL_COMMAND, check.remediation)
 
+    def test_missing_ccusage_blocks_claude_support_check(self) -> None:
+        check = check_ccusage_claude_support(missing)
+
+        self.assertEqual(check.status, "error")
+        self.assertIn("claude support", check.detail)
+        self.assertIn(CCUSAGE_INSTALL_COMMAND, check.remediation)
+
     def test_required_checks_fail_when_required_tool_is_missing(self) -> None:
         checks = collect_dependency_checks(missing)
 
@@ -38,4 +46,3 @@ class DependencyCheckTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

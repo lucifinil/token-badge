@@ -5,7 +5,7 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
-from token_badge.ccusage import CcusageError, collect_codex_usage
+from token_badge.ccusage import CcusageError, collect_provider_usage
 from token_badge.api import TokenBadgeAPI, run_http_server
 from token_badge.dependencies import collect_dependency_checks, required_checks_pass
 from token_badge.evidence import build_usage_evidence, evidence_summary
@@ -39,7 +39,7 @@ def _print_json(payload: dict[str, Any]) -> None:
     print(json.dumps(payload, indent=2, sort_keys=True))
 
 
-def run_codex(args: argparse.Namespace) -> int:
+def run_usage_provider(args: argparse.Namespace, provider: str) -> int:
     collector_installation_id = args.collector_id or args.subject
     challenge_nonce = args.challenge
     if args.upload_url and not collector_installation_id:
@@ -63,11 +63,12 @@ def run_codex(args: argparse.Namespace) -> int:
             return 1
 
     try:
-        snapshot = collect_codex_usage(
+        snapshot = collect_provider_usage(
+            provider,
             since=args.since,
             until=args.until,
             timezone=args.timezone,
-            speed=args.speed,
+            speed=getattr(args, "speed", None),
         )
     except CcusageError as exc:
         print(f"error: {exc}")
@@ -156,6 +157,14 @@ def run_codex(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_codex(args: argparse.Namespace) -> int:
+    return run_usage_provider(args, "codex")
+
+
+def run_claude(args: argparse.Namespace) -> int:
+    return run_usage_provider(args, "claude")
+
+
 def run_tiers(args: argparse.Namespace) -> int:
     rows = [
         {
@@ -223,36 +232,43 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subcommands = parser.add_subparsers(dest="command", required=True)
 
+    def add_usage_provider_arguments(command: argparse.ArgumentParser) -> None:
+        command.add_argument("--github", help="GitHub login to include in the local report")
+        command.add_argument("--github-node-id", help="Stable GitHub node_id from backend enrollment")
+        command.add_argument(
+            "--subject",
+            help="Optional local collector subject hint; server enrollment should create the real ID",
+        )
+        command.add_argument(
+            "--collector-id",
+            help="Collector installation ID issued during enrollment; falls back to --subject for the prototype",
+        )
+        command.add_argument(
+            "--challenge",
+            help="Server-issued challenge nonce to bind the local usage report to a collection attempt",
+        )
+        command.add_argument(
+            "--upload-url",
+            help="Backend base URL; when set, request a challenge if needed and upload minimal usage metadata",
+        )
+        command.add_argument("--since", help="Start date passed to ccusage, YYYY-MM-DD or YYYYMMDD")
+        command.add_argument("--until", help="End date passed to ccusage, inclusive")
+        command.add_argument("--timezone", help="IANA timezone passed to ccusage")
+        command.add_argument("--include-raw-totals", action="store_true")
+        command.add_argument("--json", action="store_true", help="Emit JSON")
+
     codex = subcommands.add_parser("codex", help="Collect Codex subscription usage via ccusage")
-    codex.add_argument("--github", help="GitHub login to include in the local report")
-    codex.add_argument("--github-node-id", help="Stable GitHub node_id from backend enrollment")
-    codex.add_argument(
-        "--subject",
-        help="Optional local collector subject hint; server enrollment should create the real ID",
-    )
-    codex.add_argument(
-        "--collector-id",
-        help="Collector installation ID issued during enrollment; falls back to --subject for the prototype",
-    )
-    codex.add_argument(
-        "--challenge",
-        help="Server-issued challenge nonce to bind the local usage report to a collection attempt",
-    )
-    codex.add_argument(
-        "--upload-url",
-        help="Backend base URL; when set, request a challenge if needed and upload minimal usage metadata",
-    )
-    codex.add_argument("--since", help="Start date passed to ccusage, YYYY-MM-DD or YYYYMMDD")
-    codex.add_argument("--until", help="End date passed to ccusage, inclusive")
-    codex.add_argument("--timezone", help="IANA timezone passed to ccusage")
+    add_usage_provider_arguments(codex)
     codex.add_argument(
         "--speed",
         choices=("auto", "standard", "fast"),
         help="Codex cost speed tier passed to ccusage",
     )
-    codex.add_argument("--include-raw-totals", action="store_true")
-    codex.add_argument("--json", action="store_true", help="Emit JSON")
     codex.set_defaults(func=run_codex)
+
+    claude = subcommands.add_parser("claude", help="Collect Claude Code subscription usage via ccusage")
+    add_usage_provider_arguments(claude)
+    claude.set_defaults(func=run_claude)
 
     tiers = subcommands.add_parser("tiers", help="Show badge tiers")
     tiers.add_argument("--json", action="store_true", help="Emit JSON")

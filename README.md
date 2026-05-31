@@ -8,6 +8,7 @@ usage source.
 
 - Count subscription-based token consumption only.
 - Start with Codex usage collected by `ccusage`.
+- Support Claude Code through the same local `ccusage` collection path.
 - Bind usage to a GitHub identity before granting a badge.
 - Keep provider-specific identity and usage evidence separate so the project can add
   Claude Code, Copilot, Gemini, and other agents later.
@@ -50,7 +51,7 @@ Current local collector dependencies are:
 
 - Python 3.11 or newer.
 - Node.js/npm for installing or upgrading `ccusage`.
-- `ccusage` with Codex command support.
+- `ccusage` with Codex and Claude Code command support.
 
 Check readiness before collecting usage:
 
@@ -64,10 +65,26 @@ Run the Codex collector directly from the checkout:
 PYTHONPATH=src python3 -m token_badge.cli codex --github <github-login> --json
 ```
 
+Run the Claude Code collector directly from the checkout:
+
+```bash
+PYTHONPATH=src python3 -m token_badge.cli claude --github <github-login> --json
+```
+
 Bind a Codex report to a server-issued collection challenge:
 
 ```bash
 PYTHONPATH=src python3 -m token_badge.cli codex \
+  --github <github-login> \
+  --collector-id <collector-installation-id> \
+  --challenge <server-nonce> \
+  --json
+```
+
+The same challenge-bound upload flow is available for Claude Code:
+
+```bash
+PYTHONPATH=src python3 -m token_badge.cli claude \
   --github <github-login> \
   --collector-id <collector-installation-id> \
   --challenge <server-nonce> \
