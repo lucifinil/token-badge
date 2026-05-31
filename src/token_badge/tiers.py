@@ -13,23 +13,23 @@ class BadgeTier:
 DEFAULT_TIERS: tuple[BadgeTier, ...] = (
     BadgeTier(
         threshold=100_000_000,
-        name="Wonder Kid",
+        name="Hot AI Prospect",
         description="Crossed the first 100 million subscription-agent tokens.",
     ),
     BadgeTier(
+        threshold=500_000_000,
+        name="Wonder AI Kid",
+        description="Reached half a billion subscription-agent tokens.",
+    ),
+    BadgeTier(
         threshold=1_000_000_000,
-        name="AI Smart Boy",
+        name="Key AI Player",
         description="Reached one billion subscription-agent tokens.",
     ),
     BadgeTier(
         threshold=10_000_000_000,
-        name="AI Power User",
+        name="World-Class AI Player",
         description="Reached ten billion subscription-agent tokens.",
-    ),
-    BadgeTier(
-        threshold=100_000_000_000,
-        name="Context Titan",
-        description="Reached one hundred billion subscription-agent tokens.",
     ),
 )
 
@@ -46,4 +46,3 @@ def next_tier(total_tokens: int, tiers: tuple[BadgeTier, ...] = DEFAULT_TIERS) -
         if total_tokens < tier.threshold:
             return tier
     return None
-

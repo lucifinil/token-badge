@@ -14,18 +14,18 @@ identity for coding-agent usage.
 1. User opens Token Badge and signs in with GitHub.
 2. Token Badge shows a one-line local collection command.
 3. User runs the command on the machine where Codex usage is available.
-4. The collector reads `ccusage codex monthly --json`.
-5. Token Badge records the total token count and grants the highest earned badge.
+4. The collector reads `ccusage codex monthly --json` or `ccusage claude monthly --json`.
+5. Token Badge records the provider total and grants from the user's highest provider total.
 6. User can publish a badge URL or have a GitHub app update their profile README.
 
 ## Initial Badge Ladder
 
 | Threshold | Badge |
 | ---: | --- |
-| 100 million tokens | Wonder Kid |
-| 1 billion tokens | AI Smart Boy |
-| 10 billion tokens | AI Power User |
-| 100 billion tokens | Context Titan |
+| 100 million tokens | Hot AI Prospect |
+| 500 million tokens | Wonder AI Kid |
+| 1 billion tokens | Key AI Player |
+| 10 billion tokens | World-Class AI Player |
 
 ## Product Principles
 
@@ -43,4 +43,3 @@ identity for coding-agent usage.
 - Team or organization badges.
 - API token usage.
 - Direct mutation of a user's GitHub profile without explicit GitHub app consent.
-

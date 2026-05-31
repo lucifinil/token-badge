@@ -38,6 +38,13 @@ Health check:
 curl http://localhost:8000/healthz
 ```
 
+Public badge endpoints:
+
+```bash
+curl http://localhost:8000/v1/badges/<github-login>
+curl http://localhost:8000/v1/badges/<github-login>.svg
+```
+
 ## Collector Upload
 
 Users can upload Codex usage metadata directly from the collector:
@@ -83,3 +90,6 @@ The backend accepts and stores only:
 The API rejects full `ccusage` reports, monthly/session rows, model breakdowns, prompts,
 messages, file paths, and other logs. The current providers accepted by the backend are
 `codex` and `claude`; future provider adapters are tracked separately.
+
+Badge grants are stored separately from snapshots. Snapshots preserve the provider audit
+log; grants preserve the current public badge winner for a GitHub profile.
