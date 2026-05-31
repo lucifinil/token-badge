@@ -37,14 +37,18 @@ controls the local machine and wants to forge evidence.
 
 ## GitHub Profile Granting
 
-There are two viable publication modes:
+The default publication mode is a dynamic badge link in the user's special GitHub
+profile repository. The local updater uses the existing GitHub connection first:
 
-1. Badge URL: Token Badge hosts an SVG badge endpoint. User adds Markdown to their
-   GitHub profile README.
-2. GitHub app: user grants repository permission, and Token Badge updates the profile
-   README or a badge gist on their behalf.
+- Resolve the authenticated GitHub user through `gh`.
+- Refuse to update a different login from the authenticated user.
+- Insert or replace only the `token-badge` marker block in `README.md`.
+- Ask for GitHub SSO/OAuth only when no usable local GitHub connection exists or when
+  the current token cannot write to the profile repository.
 
-The first mode is safer for MVP because it avoids write access to GitHub repositories.
+This still grants a README badge, not a native GitHub achievement badge. The SVG remains
+hosted by Token Badge, so higher future grants update visually without another README
+commit.
 
 ## Future Provider Verification
 

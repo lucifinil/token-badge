@@ -82,6 +82,19 @@ PYTHONPATH=src python3 -m token_badge.cli codex \
   --json
 ```
 
+To upload usage and immediately install or refresh the GitHub profile README badge,
+add `--profile-badge`. The command uses the connected local GitHub account and defaults
+the badge URL to `--upload-url` unless `TOKEN_BADGE_PUBLIC_URL` or `--badge-base-url` is
+set:
+
+```bash
+PYTHONPATH=src python3 -m token_badge.cli codex \
+  --github <github-login> \
+  --collector-id <collector-installation-id> \
+  --upload-url https://token-badge.example.com \
+  --profile-badge
+```
+
 The same challenge-bound upload flow is available for Claude Code:
 
 ```bash
@@ -114,6 +127,17 @@ The backend exposes a GitHub-profile-friendly SVG badge:
 
 The JSON endpoint at `/v1/badges/<github-login>` explains which provider snapshot is
 currently winning the badge.
+
+Install or refresh the badge block in the authenticated user's GitHub profile README:
+
+```bash
+TOKEN_BADGE_PUBLIC_URL=https://token-badge.example.com \
+  PYTHONPATH=src python3 -m token_badge.cli profile-badge
+```
+
+Use `--dry-run` to preview the README content first. The command uses the existing local
+GitHub connection through `gh`; if that connection is missing or lacks access, proceed
+with GitHub SSO/OAuth before retrying.
 
 ## Repository Map
 

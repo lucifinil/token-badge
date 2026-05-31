@@ -53,24 +53,39 @@ counter.
 The 100B tier is intentionally aspirational. It can remain sparse until real usage
 distribution data proves that another tier is needed above it.
 
-## GitHub Profile Association
+## GitHub Profile Publication
 
-The current association is not automatic GitHub profile mutation. The backend associates
-uploads with the submitted `github_login` and publishes badge endpoints:
+The backend associates uploads with the submitted `github_login` and publishes badge
+endpoints:
 
 ```text
 GET /v1/badges/<github-login>
 GET /v1/badges/<github-login>.svg
 ```
 
-The profile owner adds the SVG endpoint to their profile README:
+The profile README points at the SVG endpoint:
 
 ```markdown
 [![Token Badge](https://token-badge.example.com/v1/badges/lucifinil.svg)](https://token-badge.example.com/v1/badges/lucifinil)
 ```
 
-Later GitHub OAuth should replace the login-only association with a verified
-`github_node_id` enrollment flow and optional GitHub App README updates.
+The local automation uses the existing GitHub connection first. It resolves the
+authenticated GitHub user with `gh`, reads the special profile repository
+`<github-login>/<github-login>`, and inserts or replaces a bounded block:
+
+```markdown
+<!-- token-badge:start -->
+[![Token Badge](https://token-badge.example.com/v1/badges/lucifinil.svg)](https://token-badge.example.com/v1/badges/lucifinil)
+<!-- token-badge:end -->
+```
+
+If `gh` is not connected or does not have profile repository write access, the product
+should ask the user whether they want to proceed with GitHub SSO/OAuth. The profile
+automation only installs the dynamic badge link; grant calculation remains in the
+backend.
+
+Collector commands can run this publication step immediately after an accepted upload
+with `--profile-badge`.
 
 ## Visual Direction
 
