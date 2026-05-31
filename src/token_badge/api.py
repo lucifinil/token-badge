@@ -8,6 +8,7 @@ from typing import Any, Protocol
 from urllib.parse import unquote, urlparse
 
 from token_badge.badges import badge_summary_from_record, render_badge_svg
+from token_badge.rankings import ConsumptionRanking, ranking_message
 
 
 ALLOWED_CHALLENGE_KEYS = {"collector_installation_id", "github_login", "github_node_id"}
@@ -47,6 +48,9 @@ class Storage(Protocol):
         ...
 
     def get_badge_grant(self, github_login: str) -> dict[str, Any] | None:
+        ...
+
+    def get_consumption_ranking(self, github_login: str) -> ConsumptionRanking:
         ...
 
 
@@ -161,6 +165,8 @@ class TokenBadgeAPI:
                 return APIResponse(200, {"ok": True})
             if method == "GET" and clean_path.startswith("/v1/badges/"):
                 return self._get_badge(clean_path)
+            if method == "GET" and clean_path.startswith("/v1/rankings/"):
+                return self._get_ranking(clean_path)
             if method == "POST" and clean_path == "/v1/challenges":
                 return self._create_challenge(payload or {})
             if method == "POST" and clean_path == "/v1/usage-snapshots":
@@ -200,6 +206,17 @@ class TokenBadgeAPI:
         if wants_svg:
             return APIResponse(200, render_badge_svg(summary), content_type="image/svg+xml")
         return APIResponse(200, summary)
+
+    def _get_ranking(self, path: str) -> APIResponse:
+        github_login = unquote(path.removeprefix("/v1/rankings/"))
+        if not github_login:
+            return APIResponse(400, {"error": "github_login is required"})
+
+        ranking = self.storage.get_consumption_ranking(github_login)
+        body = ranking.to_dict()
+        body["github_login"] = github_login
+        body["message"] = ranking_message(ranking)
+        return APIResponse(200, body)
 
 
 def run_http_server(api: TokenBadgeAPI, *, host: str, port: int) -> None:

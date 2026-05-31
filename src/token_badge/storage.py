@@ -7,6 +7,7 @@ from typing import Any, Mapping
 from urllib.parse import parse_qs, unquote, urlparse
 
 from token_badge.badges import badge_grant_from_snapshot, github_identity_key, should_replace_badge_grant
+from token_badge.rankings import ConsumptionRanking, compute_ranking
 
 DATABASE_ENV_NAMES = ("TiDB_DSN", "TiDB_DNS")
 
@@ -293,6 +294,36 @@ class TiDBStorage:
             "trust_level",
         )
         return dict(zip(keys, row, strict=True))
+
+    def get_user_totals(self) -> dict[str, int]:
+        """Return each profile's highest accepted total, keyed by identity."""
+        try:
+            with self._connect() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT
+                            COALESCE(
+                                CONCAT('github_login:', LOWER(github_login)),
+                                CONCAT('github_node_id:', github_node_id)
+                            ) AS identity_key,
+                            MAX(total_tokens) AS total
+                        FROM usage_snapshots
+                        WHERE github_login IS NOT NULL OR github_node_id IS NOT NULL
+                        GROUP BY identity_key
+                        """
+                    )
+                    rows = cursor.fetchall()
+        except StorageConfigurationError:
+            raise
+        except Exception as exc:
+            raise StorageError("failed to read usage totals") from exc
+
+        return {row[0]: int(row[1]) for row in rows}
+
+    def get_consumption_ranking(self, github_login: str) -> ConsumptionRanking:
+        identity_key = github_identity_key(github_login)
+        return compute_ranking(self.get_user_totals(), identity_key)
 
     def _upsert_badge_grant(self, cursor: Any, snapshot: dict[str, Any], snapshot_id: str) -> None:
         candidate = badge_grant_from_snapshot(snapshot, snapshot_id)

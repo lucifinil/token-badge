@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urljoin
+from urllib.parse import quote, urljoin
 from urllib.request import Request, urlopen
 
 
@@ -38,6 +38,27 @@ def post_json(base_url: str, path: str, payload: dict[str, Any], timeout_seconds
     return decoded
 
 
+def get_json(base_url: str, path: str, timeout_seconds: int = 30) -> dict[str, Any]:
+    url = urljoin(base_url.rstrip("/") + "/", path.lstrip("/"))
+    request = Request(url, headers={"Accept": "application/json"}, method="GET")
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            response_body = response.read().decode("utf-8")
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise UploadError(f"request failed with HTTP {exc.code}: {detail}") from exc
+    except URLError as exc:
+        raise UploadError(f"request failed: {exc.reason}") from exc
+
+    try:
+        decoded = json.loads(response_body)
+    except json.JSONDecodeError as exc:
+        raise UploadError("endpoint returned non-JSON output") from exc
+    if not isinstance(decoded, dict):
+        raise UploadError("endpoint returned an unexpected JSON shape")
+    return decoded
+
+
 def request_challenge(
     base_url: str,
     *,
@@ -58,4 +79,8 @@ def request_challenge(
 
 def upload_usage_snapshot(base_url: str, snapshot: dict[str, Any]) -> dict[str, Any]:
     return post_json(base_url, "/v1/usage-snapshots", snapshot)
+
+
+def fetch_ranking(base_url: str, github_login: str) -> dict[str, Any]:
+    return get_json(base_url, f"/v1/rankings/{quote(github_login, safe='')}")
 

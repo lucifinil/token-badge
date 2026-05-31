@@ -12,7 +12,7 @@ from token_badge.evidence import build_usage_evidence, evidence_summary
 from token_badge.github_profile import GitHubProfileClient, GitHubProfileError, badge_base_url_from_env
 from token_badge.storage import StorageConfigurationError, StorageError, TiDBStorage
 from token_badge.tiers import DEFAULT_TIERS, earned_tier, next_tier
-from token_badge.upload import UploadError, request_challenge, upload_usage_snapshot
+from token_badge.upload import UploadError, fetch_ranking, request_challenge, upload_usage_snapshot
 
 
 def _tier_payload(total_tokens: int) -> dict[str, Any]:
@@ -313,6 +313,140 @@ def run_profile_badge(args: argparse.Namespace) -> int:
     return 0
 
 
+def _prompt_yes_no(question: str) -> bool:
+    try:
+        answer = input(f"{question} [y/N]: ").strip().lower()
+    except EOFError:
+        return False
+    return answer in {"y", "yes"}
+
+
+def run_start(args: argparse.Namespace, confirm=_prompt_yes_no) -> int:
+    """One-shot quickstart: upload usage, report the badge and percentile, then
+    offer to install the GitHub profile badge."""
+    if not args.upload_url:
+        print("error: start requires --upload-url so usage can be ranked against other adopters")
+        return 1
+
+    profile_client = GitHubProfileClient()
+    github_login = args.github
+    if not github_login:
+        try:
+            github_login = profile_client.authenticated_login()
+        except GitHubProfileError as exc:
+            print(f"error: {exc}")
+            return 1
+
+    collector_installation_id = args.collector_id or args.subject
+    if not collector_installation_id:
+        print("error: start requires --collector-id (falls back to --subject for the prototype)")
+        return 1
+
+    try:
+        challenge = request_challenge(
+            args.upload_url,
+            collector_installation_id=collector_installation_id,
+            github_login=github_login,
+            github_node_id=args.github_node_id,
+        )
+    except UploadError as exc:
+        print(f"error: {exc}")
+        return 1
+    challenge_nonce = challenge.get("challenge_nonce")
+    if not isinstance(challenge_nonce, str) or not challenge_nonce:
+        print("error: upload endpoint did not return a challenge_nonce")
+        return 1
+
+    try:
+        snapshot = collect_provider_usage(
+            args.provider,
+            since=args.since,
+            until=args.until,
+            timezone=args.timezone,
+            speed=getattr(args, "speed", None),
+        )
+    except CcusageError as exc:
+        print(f"error: {exc}")
+        return 1
+
+    trust_level = "local-self-reported"
+    evidence = evidence_summary(
+        build_usage_evidence(
+            provider=snapshot.provider,
+            usage_kind=snapshot.usage_kind,
+            source=snapshot.source,
+            trust_level=trust_level,
+            total_tokens=snapshot.total_tokens,
+            challenge_nonce=challenge_nonce,
+            collector_installation_id=collector_installation_id,
+            github_login=github_login,
+            raw_totals=snapshot.raw_totals,
+        )
+    )
+
+    try:
+        upload_usage_snapshot(
+            args.upload_url,
+            {
+                "challenge_nonce": evidence["challenge_nonce"],
+                "collector_installation_id": collector_installation_id,
+                "github_login": github_login,
+                "github_node_id": args.github_node_id,
+                "provider": snapshot.provider,
+                "raw_totals": snapshot.raw_totals,
+                "report_hash": evidence["report_hash"],
+                "source": snapshot.source,
+                "total_tokens": snapshot.total_tokens,
+                "trust_level": trust_level,
+                "usage_kind": snapshot.usage_kind,
+            },
+        )
+        ranking = fetch_ranking(args.upload_url, github_login)
+    except UploadError as exc:
+        print(f"error: {exc}")
+        return 1
+
+    earned = earned_tier(snapshot.total_tokens)
+    summary = {
+        "github_login": github_login,
+        "provider": snapshot.provider,
+        "total_tokens": snapshot.total_tokens,
+        "earned_badge": None if earned is None else earned.name,
+        "ranking": ranking,
+    }
+
+    if args.json:
+        _print_json(summary)
+        return 0
+
+    print(f"Total consumption: {snapshot.total_tokens:,} tokens ({snapshot.provider})")
+    print(f"Badge tier: {earned.name if earned else 'None yet'}")
+    print(ranking.get("message", ""))
+
+    if not confirm("Create your GitHub profile repo and show the badge?"):
+        print("No problem — skipping profile badge. Your usage is still recorded.")
+        return 0
+
+    badge_base_url = args.badge_base_url or badge_base_url_from_env() or args.upload_url
+    try:
+        update = profile_client.install_badge(
+            github_login=github_login,
+            badge_base_url=badge_base_url,
+            dry_run=False,
+            message=args.profile_badge_message,
+            create_repo=True,
+        )
+    except GitHubProfileError as exc:
+        print(f"error: {exc}")
+        return 1
+
+    if update.repo_created:
+        print(f"Profile repository: created ({update.repository})")
+    action = "updated" if update.changed else "already up to date"
+    print(f"Profile badge: {action} ({update.repository})")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="token-badge",
@@ -371,6 +505,49 @@ def build_parser() -> argparse.ArgumentParser:
     claude = subcommands.add_parser("claude", help="Collect Claude Code subscription usage via ccusage")
     add_usage_provider_arguments(claude)
     claude.set_defaults(func=run_claude)
+
+    start = subcommands.add_parser(
+        "start",
+        help="Quickstart: upload usage, show the badge tier and percentile, then offer the profile badge",
+    )
+    start.add_argument(
+        "--provider",
+        choices=("codex", "claude"),
+        default="claude",
+        help="Subscription agent to collect usage from (default: claude)",
+    )
+    start.add_argument("--github", help="GitHub login; defaults to the authenticated local GitHub user")
+    start.add_argument("--github-node-id", help="Stable GitHub node_id from backend enrollment")
+    start.add_argument("--subject", help="Optional local collector subject hint; falls back to --collector-id")
+    start.add_argument("--collector-id", help="Collector installation ID issued during enrollment")
+    start.add_argument(
+        "--upload-url",
+        required=True,
+        help="Backend base URL used to upload usage and rank it against other adopters",
+    )
+    start.add_argument("--since", help="Start date passed to ccusage, YYYY-MM-DD or YYYYMMDD")
+    start.add_argument("--until", help="End date passed to ccusage, inclusive")
+    start.add_argument("--timezone", help="IANA timezone passed to ccusage")
+    start.add_argument(
+        "--speed",
+        choices=("auto", "standard", "fast"),
+        help="Codex cost speed tier passed to ccusage (codex provider only)",
+    )
+    start.add_argument(
+        "--badge-base-url",
+        help="Public badge URL for the profile badge; defaults to TOKEN_BADGE_PUBLIC_URL or --upload-url",
+    )
+    start.add_argument(
+        "--profile-badge-message",
+        default="Add Token Badge profile badge",
+        help="Commit message used when installing the profile badge",
+    )
+    start.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit the usage, tier, and percentile summary as JSON and skip the profile-badge prompt",
+    )
+    start.set_defaults(func=run_start)
 
     tiers = subcommands.add_parser("tiers", help="Show badge tiers")
     tiers.add_argument("--json", action="store_true", help="Emit JSON")
