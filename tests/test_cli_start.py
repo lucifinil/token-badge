@@ -23,6 +23,7 @@ def start_args(**overrides: object) -> argparse.Namespace:
         "speed": None,
         "badge_base_url": None,
         "profile_badge_message": "Add Token Badge profile badge",
+        "install_badge": False,
         "json": False,
     }
     base.update(overrides)
@@ -83,6 +84,26 @@ class StartFlowTest(unittest.TestCase):
     def test_start_skips_badge_when_user_declines(self) -> None:
         with self._patched_collaborators():
             code = cli.run_start(start_args(), confirm=lambda _question: False)
+
+        self.assertEqual(code, 0)
+        self.assertFalse(FakeProfileClient.instances[0].installed)
+
+    def test_install_badge_flag_installs_without_prompting(self) -> None:
+        def fail_if_called(_question: str) -> bool:
+            raise AssertionError("--install-badge must not prompt")
+
+        with self._patched_collaborators():
+            code = cli.run_start(start_args(install_badge=True), confirm=fail_if_called)
+
+        self.assertEqual(code, 0)
+        self.assertTrue(FakeProfileClient.instances[0].installed)
+
+    def test_json_without_install_flag_is_report_only(self) -> None:
+        def fail_if_called(_question: str) -> bool:
+            raise AssertionError("--json report mode must not prompt")
+
+        with self._patched_collaborators():
+            code = cli.run_start(start_args(json=True), confirm=fail_if_called)
 
         self.assertEqual(code, 0)
         self.assertFalse(FakeProfileClient.instances[0].installed)

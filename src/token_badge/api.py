@@ -9,6 +9,7 @@ from urllib.parse import unquote, urlparse
 
 from token_badge.badges import badge_summary_from_record, render_badge_svg
 from token_badge.rankings import ConsumptionRanking, ranking_message
+from token_badge.skill import SKILL_MARKDOWN
 
 
 ALLOWED_CHALLENGE_KEYS = {"collector_installation_id", "github_login", "github_node_id"}
@@ -163,6 +164,8 @@ class TokenBadgeAPI:
             clean_path = urlparse(path).path
             if method == "GET" and clean_path == "/healthz":
                 return APIResponse(200, {"ok": True})
+            if method == "GET" and clean_path.lower() == "/skill.md":
+                return APIResponse(200, SKILL_MARKDOWN, content_type="text/markdown; charset=utf-8")
             if method == "GET" and clean_path.startswith("/v1/badges/"):
                 return self._get_badge(clean_path)
             if method == "GET" and clean_path.startswith("/v1/rankings/"):

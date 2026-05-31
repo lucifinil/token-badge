@@ -417,13 +417,18 @@ def run_start(args: argparse.Namespace, confirm=_prompt_yes_no) -> int:
 
     if args.json:
         _print_json(summary)
+    else:
+        print(f"Total consumption: {snapshot.total_tokens:,} tokens ({snapshot.provider})")
+        print(f"Badge tier: {earned.name if earned else 'None yet'}")
+        print(ranking.get("message", ""))
+
+    # --install-badge installs without prompting (for agents driving the flow);
+    # --json without it is report-only; otherwise ask the human.
+    if args.install_badge:
+        pass
+    elif args.json:
         return 0
-
-    print(f"Total consumption: {snapshot.total_tokens:,} tokens ({snapshot.provider})")
-    print(f"Badge tier: {earned.name if earned else 'None yet'}")
-    print(ranking.get("message", ""))
-
-    if not confirm("Create your GitHub profile repo and show the badge?"):
+    elif not confirm("Create your GitHub profile repo and show the badge?"):
         print("No problem — skipping profile badge. Your usage is still recorded.")
         return 0
 
@@ -543,9 +548,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Commit message used when installing the profile badge",
     )
     start.add_argument(
+        "--install-badge",
+        action="store_true",
+        help="Create the profile repo (if needed) and install the badge without prompting; for agent-driven runs",
+    )
+    start.add_argument(
         "--json",
         action="store_true",
-        help="Emit the usage, tier, and percentile summary as JSON and skip the profile-badge prompt",
+        help="Emit the usage, tier, and percentile summary as JSON; report-only unless --install-badge is also set",
     )
     start.set_defaults(func=run_start)
 

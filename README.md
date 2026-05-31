@@ -4,6 +4,19 @@ Token Badge grants public profile badges for subscription-based AI agent token u
 The first provider target is Codex, using `ccusage codex monthly --json` as the local
 usage source.
 
+## Start From Your AI Agent
+
+Token Badge is a deployed service. Users do not run anything by hand — they give their
+coding agent (Claude Code or Codex) one statement:
+
+> **"Read https://&lt;your-token-badge-host&gt;/SKILL.md and follow the instructions to
+> install and configure Token Badge for Claude Code."**
+
+The service serves agent-followable instructions at `GET /SKILL.md`. The agent reads
+them, collects the user's usage locally via `ccusage`, uploads it, reports the badge
+tier and percentile, and — only with the user's consent — adds the badge to their GitHub
+profile. The canonical copy lives in [SKILL.md](SKILL.md).
+
 ## First Scope
 
 - Count subscription-based token consumption only.
