@@ -106,33 +106,41 @@ def check_ccusage(which: WhichFn = shutil.which) -> DependencyCheck:
     return DependencyCheck(name="ccusage", status="ok" if ok else "error", required=True, detail=detail)
 
 
-def check_ccusage_codex_support(which: WhichFn = shutil.which) -> DependencyCheck:
+def check_ccusage_provider_support(provider: str, which: WhichFn = shutil.which) -> DependencyCheck:
     ccusage_path = which("ccusage")
     if not ccusage_path:
         return DependencyCheck(
-            name="ccusage-codex",
+            name=f"ccusage-{provider}",
             status="error",
             required=True,
-            detail="cannot check Codex support because ccusage is missing",
+            detail=f"cannot check {provider} support because ccusage is missing",
             remediation=CCUSAGE_INSTALL_GUIDANCE,
         )
 
-    ok, output = _command_output([ccusage_path, "codex", "--help"])
+    ok, output = _command_output([ccusage_path, provider, "--help"])
     if ok and "monthly" in output and "session" in output:
         return DependencyCheck(
-            name="ccusage-codex",
+            name=f"ccusage-{provider}",
             status="ok",
             required=True,
-            detail="ccusage exposes Codex monthly and session commands",
+            detail=f"ccusage exposes {provider} monthly and session commands",
         )
 
     return DependencyCheck(
-        name="ccusage-codex",
+        name=f"ccusage-{provider}",
         status="error",
         required=True,
-        detail="ccusage is installed but Codex commands were not detected",
+        detail=f"ccusage is installed but {provider} commands were not detected",
         remediation=f"Upgrade ccusage with `{CCUSAGE_INSTALL_COMMAND}`.",
     )
+
+
+def check_ccusage_codex_support(which: WhichFn = shutil.which) -> DependencyCheck:
+    return check_ccusage_provider_support("codex", which)
+
+
+def check_ccusage_claude_support(which: WhichFn = shutil.which) -> DependencyCheck:
+    return check_ccusage_provider_support("claude", which)
 
 
 def collect_dependency_checks(which: WhichFn = shutil.which) -> list[DependencyCheck]:
@@ -141,9 +149,9 @@ def collect_dependency_checks(which: WhichFn = shutil.which) -> list[DependencyC
         check_npm(which),
         check_ccusage(which),
         check_ccusage_codex_support(which),
+        check_ccusage_claude_support(which),
     ]
 
 
 def required_checks_pass(checks: list[DependencyCheck]) -> bool:
     return all(check.ok for check in checks if check.required)
-

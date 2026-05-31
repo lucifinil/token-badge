@@ -96,7 +96,24 @@ class APITest(unittest.TestCase):
         response = TokenBadgeAPI(FakeStorage()).handle("POST", "/v1/usage-snapshots", payload)
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("only codex", response.body["error"])
+        self.assertIn("unsupported provider", response.body["error"])
+
+    def test_snapshot_endpoint_accepts_claude_minimal_totals(self) -> None:
+        payload = valid_snapshot()
+        payload["provider"] = "claude"
+        payload["source"] = "ccusage claude monthly --json"
+        payload["raw_totals"] = {
+            "cacheCreationTokens": 10,
+            "cacheReadTokens": 20,
+            "inputTokens": 30,
+            "outputTokens": 40,
+            "totalCost": 1.23,
+            "totalTokens": 100,
+        }
+
+        response = TokenBadgeAPI(FakeStorage()).handle("POST", "/v1/usage-snapshots", payload)
+
+        self.assertEqual(response.status_code, 201)
 
     def test_validate_snapshot_rejects_nested_raw_totals(self) -> None:
         payload = valid_snapshot()

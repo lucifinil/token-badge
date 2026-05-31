@@ -10,10 +10,13 @@ from typing import Any, Protocol
 ALLOWED_CHALLENGE_KEYS = {"collector_installation_id", "github_login", "github_node_id"}
 ALLOWED_RAW_TOTAL_KEYS = {
     "cachedInputTokens",
+    "cacheCreationTokens",
+    "cacheReadTokens",
     "costUSD",
     "inputTokens",
     "outputTokens",
     "reasoningOutputTokens",
+    "totalCost",
     "totalTokens",
 }
 ALLOWED_SNAPSHOT_KEYS = {
@@ -30,6 +33,7 @@ ALLOWED_SNAPSHOT_KEYS = {
     "usage_kind",
 }
 ALLOWED_TRUST_LEVELS = {"local-self-reported", "challenge-signed", "provider-verified"}
+ALLOWED_PROVIDERS = {"codex", "claude"}
 
 
 class Storage(Protocol):
@@ -109,8 +113,8 @@ def validate_usage_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
     _reject_unknown_keys(payload, ALLOWED_SNAPSHOT_KEYS)
 
     provider = _required_str(payload, "provider")
-    if provider != "codex":
-        raise APIError(400, "only codex usage snapshots are accepted by this version")
+    if provider not in ALLOWED_PROVIDERS:
+        raise APIError(400, f"unsupported provider: {provider}")
 
     usage_kind = _required_str(payload, "usage_kind")
     if usage_kind != "subscription":

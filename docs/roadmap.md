@@ -34,6 +34,7 @@
 ## Milestone 4: Provider Expansion
 
 - Add provider adapters behind the same `UsageSnapshot` contract.
+- Add Claude Code as the first post-Codex provider using `ccusage claude`.
 - Keep subscription usage separate from API usage.
 - Support provider-verified receipts when available.
 - Add per-provider and combined-subscription badge scopes.
