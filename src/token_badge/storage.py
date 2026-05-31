@@ -6,6 +6,7 @@ import uuid
 from typing import Any, Mapping
 from urllib.parse import parse_qs, unquote, urlparse
 
+from token_badge.badges import badge_grant_from_snapshot, github_identity_key, should_replace_badge_grant
 
 DATABASE_ENV_NAMES = ("TiDB_DSN", "TiDB_DNS")
 
@@ -18,6 +19,23 @@ SCHEMA_STATEMENTS = (
         github_node_id VARCHAR(255) NULL,
         created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
         used_at TIMESTAMP(6) NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS badge_grants (
+        identity_key VARCHAR(320) PRIMARY KEY,
+        github_login VARCHAR(255) NULL,
+        github_node_id VARCHAR(255) NULL,
+        tier_name VARCHAR(128) NOT NULL,
+        tier_threshold BIGINT UNSIGNED NOT NULL,
+        winning_provider VARCHAR(64) NOT NULL,
+        winning_snapshot_id CHAR(36) NOT NULL,
+        winning_total_tokens BIGINT UNSIGNED NOT NULL,
+        trust_level VARCHAR(64) NOT NULL,
+        granted_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+        updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+        KEY idx_badge_grants_github_login (github_login),
+        KEY idx_badge_grants_github_node_id (github_node_id)
     )
     """,
     """
@@ -49,6 +67,14 @@ class StorageConfigurationError(RuntimeError):
 
 class StorageError(RuntimeError):
     """Raised when a storage operation fails."""
+
+
+def challenge_matches_snapshot(challenge: Mapping[str, Any], snapshot: Mapping[str, Any]) -> bool:
+    return (
+        challenge["collector_installation_id"] == snapshot["collector_installation_id"]
+        and challenge.get("github_login") == snapshot.get("github_login")
+        and challenge.get("github_node_id") == snapshot.get("github_node_id")
+    )
 
 
 def get_tidb_dsn(env: Mapping[str, str] = os.environ) -> str | None:
@@ -142,60 +168,203 @@ class TiDBStorage:
 
         try:
             with self._connect() as connection:
-                with connection.cursor() as cursor:
-                    cursor.execute(
-                        "SELECT challenge_nonce FROM usage_challenges WHERE challenge_nonce = %s",
-                        (snapshot["challenge_nonce"],),
-                    )
-                    if cursor.fetchone() is None:
-                        raise StorageError("challenge_nonce was not issued by this backend")
-
-                    cursor.execute(
-                        """
-                        INSERT INTO usage_snapshots (
-                            id,
-                            provider,
-                            usage_kind,
-                            total_tokens,
-                            trust_level,
-                            github_login,
-                            github_node_id,
-                            collector_installation_id,
-                            challenge_nonce,
-                            report_hash,
-                            source,
-                            raw_totals_json
+                try:
+                    connection.begin()
+                    with connection.cursor() as cursor:
+                        cursor.execute(
+                            """
+                            SELECT
+                                collector_installation_id,
+                                github_login,
+                                github_node_id,
+                                used_at
+                            FROM usage_challenges
+                            WHERE challenge_nonce = %s
+                            FOR UPDATE
+                            """,
+                            (snapshot["challenge_nonce"],),
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        """,
-                        (
-                            snapshot_id,
-                            snapshot["provider"],
-                            snapshot["usage_kind"],
-                            snapshot["total_tokens"],
-                            snapshot["trust_level"],
-                            snapshot.get("github_login"),
-                            snapshot.get("github_node_id"),
-                            snapshot["collector_installation_id"],
-                            snapshot["challenge_nonce"],
-                            snapshot["report_hash"],
-                            snapshot["source"],
-                            raw_totals_json,
-                        ),
-                    )
-                    cursor.execute(
-                        """
-                        UPDATE usage_challenges
-                        SET used_at = COALESCE(used_at, CURRENT_TIMESTAMP(6))
-                        WHERE challenge_nonce = %s
-                        """,
-                        (snapshot["challenge_nonce"],),
-                    )
+                        row = cursor.fetchone()
+                        if row is None:
+                            raise StorageError("challenge_nonce was not issued by this backend")
+
+                        challenge = {
+                            "collector_installation_id": row[0],
+                            "github_login": row[1],
+                            "github_node_id": row[2],
+                            "used_at": row[3],
+                        }
+                        if challenge["used_at"] is not None:
+                            raise StorageError("challenge_nonce was already used")
+                        if not challenge_matches_snapshot(challenge, snapshot):
+                            raise StorageError("challenge metadata does not match usage snapshot")
+
+                        cursor.execute(
+                            """
+                            UPDATE usage_challenges
+                            SET used_at = CURRENT_TIMESTAMP(6)
+                            WHERE challenge_nonce = %s
+                            """,
+                            (snapshot["challenge_nonce"],),
+                        )
+                        cursor.execute(
+                            """
+                            INSERT INTO usage_snapshots (
+                                id,
+                                provider,
+                                usage_kind,
+                                total_tokens,
+                                trust_level,
+                                github_login,
+                                github_node_id,
+                                collector_installation_id,
+                                challenge_nonce,
+                                report_hash,
+                                source,
+                                raw_totals_json
+                            )
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """,
+                            (
+                                snapshot_id,
+                                snapshot["provider"],
+                                snapshot["usage_kind"],
+                                snapshot["total_tokens"],
+                                snapshot["trust_level"],
+                                snapshot.get("github_login"),
+                                snapshot.get("github_node_id"),
+                                snapshot["collector_installation_id"],
+                                snapshot["challenge_nonce"],
+                                snapshot["report_hash"],
+                                snapshot["source"],
+                                raw_totals_json,
+                            ),
+                        )
+                        self._upsert_badge_grant(cursor, snapshot, snapshot_id)
+                    connection.commit()
+                except Exception:
+                    connection.rollback()
+                    raise
         except (StorageConfigurationError, StorageError):
             raise
         except Exception as exc:
             raise StorageError("failed to store usage snapshot") from exc
         return snapshot_id
+
+    def get_badge_grant(self, github_login: str) -> dict[str, Any] | None:
+        identity_key = github_identity_key(github_login)
+        try:
+            with self._connect() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT
+                            identity_key,
+                            github_login,
+                            github_node_id,
+                            tier_name,
+                            tier_threshold,
+                            winning_provider,
+                            winning_snapshot_id,
+                            winning_total_tokens,
+                            trust_level
+                        FROM badge_grants
+                        WHERE identity_key = %s
+                        """,
+                        (identity_key,),
+                    )
+                    row = cursor.fetchone()
+        except StorageConfigurationError:
+            raise
+        except Exception as exc:
+            raise StorageError("failed to read badge grant") from exc
+
+        if row is None:
+            return None
+        keys = (
+            "identity_key",
+            "github_login",
+            "github_node_id",
+            "tier_name",
+            "tier_threshold",
+            "winning_provider",
+            "winning_snapshot_id",
+            "winning_total_tokens",
+            "trust_level",
+        )
+        return dict(zip(keys, row, strict=True))
+
+    def _upsert_badge_grant(self, cursor: Any, snapshot: dict[str, Any], snapshot_id: str) -> None:
+        candidate = badge_grant_from_snapshot(snapshot, snapshot_id)
+        if candidate is None:
+            return
+
+        cursor.execute(
+            "SELECT winning_total_tokens FROM badge_grants WHERE identity_key = %s",
+            (candidate.identity_key,),
+        )
+        row = cursor.fetchone()
+        existing_total = None if row is None else int(row[0])
+        if not should_replace_badge_grant(existing_total, candidate.winning_total_tokens):
+            return
+
+        record = candidate.to_record()
+        if row is None:
+            cursor.execute(
+                """
+                INSERT INTO badge_grants (
+                    identity_key,
+                    github_login,
+                    github_node_id,
+                    tier_name,
+                    tier_threshold,
+                    winning_provider,
+                    winning_snapshot_id,
+                    winning_total_tokens,
+                    trust_level
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    record["identity_key"],
+                    record["github_login"],
+                    record["github_node_id"],
+                    record["tier_name"],
+                    record["tier_threshold"],
+                    record["winning_provider"],
+                    record["winning_snapshot_id"],
+                    record["winning_total_tokens"],
+                    record["trust_level"],
+                ),
+            )
+            return
+
+        cursor.execute(
+            """
+            UPDATE badge_grants
+            SET
+                github_login = %s,
+                github_node_id = %s,
+                tier_name = %s,
+                tier_threshold = %s,
+                winning_provider = %s,
+                winning_snapshot_id = %s,
+                winning_total_tokens = %s,
+                trust_level = %s
+            WHERE identity_key = %s
+            """,
+            (
+                record["github_login"],
+                record["github_node_id"],
+                record["tier_name"],
+                record["tier_threshold"],
+                record["winning_provider"],
+                record["winning_snapshot_id"],
+                record["winning_total_tokens"],
+                record["trust_level"],
+                record["identity_key"],
+            ),
+        )
 
     def _connect(self) -> Any:
         try:

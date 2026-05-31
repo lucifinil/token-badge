@@ -4,19 +4,31 @@ import unittest
 from typing import Any
 
 from token_badge.api import TokenBadgeAPI, validate_usage_snapshot
+from token_badge.badges import badge_grant_from_snapshot, should_replace_badge_grant
 
 
 class FakeStorage:
     def __init__(self) -> None:
         self.challenges: list[tuple[str, dict[str, str | None]]] = []
         self.snapshots: list[dict[str, Any]] = []
+        self.grants: dict[str, dict[str, Any]] = {}
 
     def create_challenge(self, challenge_nonce: str, request: dict[str, str | None]) -> None:
         self.challenges.append((challenge_nonce, request))
 
     def store_usage_snapshot(self, snapshot: dict[str, Any]) -> str:
+        snapshot_id = f"snapshot-{len(self.snapshots) + 1}"
         self.snapshots.append(snapshot)
-        return "snapshot-1"
+        grant = badge_grant_from_snapshot(snapshot, snapshot_id)
+        if grant is not None:
+            current = self.grants.get(grant.identity_key)
+            current_total = None if current is None else current["winning_total_tokens"]
+            if should_replace_badge_grant(current_total, grant.winning_total_tokens):
+                self.grants[grant.identity_key] = grant.to_record()
+        return snapshot_id
+
+    def get_badge_grant(self, github_login: str) -> dict[str, Any] | None:
+        return self.grants.get(f"github_login:{github_login.lower()}")
 
 
 class FailingStorage(FakeStorage):
@@ -114,6 +126,48 @@ class APITest(unittest.TestCase):
         response = TokenBadgeAPI(FakeStorage()).handle("POST", "/v1/usage-snapshots", payload)
 
         self.assertEqual(response.status_code, 201)
+
+    def test_badge_endpoint_uses_highest_provider_for_same_github_user(self) -> None:
+        storage = FakeStorage()
+        api = TokenBadgeAPI(storage)
+        codex = valid_snapshot()
+        codex["total_tokens"] = 1_200_000_000
+        codex["raw_totals"]["totalTokens"] = 1_200_000_000
+        claude = valid_snapshot()
+        claude["provider"] = "claude"
+        claude["source"] = "ccusage claude monthly --json"
+        claude["total_tokens"] = 164_000_000
+        claude["raw_totals"] = {
+            "cacheCreationTokens": 1,
+            "cacheReadTokens": 2,
+            "inputTokens": 3,
+            "outputTokens": 4,
+            "totalCost": 5.0,
+            "totalTokens": 164_000_000,
+        }
+
+        self.assertEqual(api.handle("POST", "/v1/usage-snapshots", codex).status_code, 201)
+        self.assertEqual(api.handle("POST", "/v1/usage-snapshots", claude).status_code, 201)
+        response = api.handle("GET", "/v1/badges/octocat")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.body["tier"]["name"], "Key AI Player")
+        self.assertEqual(response.body["winning_provider"], "codex")
+        self.assertEqual(response.body["winning_total_tokens"], 1_200_000_000)
+
+    def test_badge_endpoint_returns_svg(self) -> None:
+        storage = FakeStorage()
+        api = TokenBadgeAPI(storage)
+        snapshot = valid_snapshot()
+        snapshot["total_tokens"] = 600_000_000
+        snapshot["raw_totals"]["totalTokens"] = 600_000_000
+
+        api.handle("POST", "/v1/usage-snapshots", snapshot)
+        response = api.handle("GET", "/v1/badges/octocat.svg")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content_type, "image/svg+xml")
+        self.assertIn("Wonder AI Kid", response.body)
 
     def test_validate_snapshot_rejects_nested_raw_totals(self) -> None:
         payload = valid_snapshot()

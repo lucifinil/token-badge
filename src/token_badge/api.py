@@ -5,6 +5,9 @@ import secrets
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Protocol
+from urllib.parse import unquote, urlparse
+
+from token_badge.badges import badge_summary_from_record, render_badge_svg
 
 
 ALLOWED_CHALLENGE_KEYS = {"collector_installation_id", "github_login", "github_node_id"}
@@ -43,11 +46,15 @@ class Storage(Protocol):
     def store_usage_snapshot(self, snapshot: dict[str, Any]) -> str:
         ...
 
+    def get_badge_grant(self, github_login: str) -> dict[str, Any] | None:
+        ...
+
 
 @dataclass(frozen=True)
 class APIResponse:
     status_code: int
-    body: dict[str, Any]
+    body: dict[str, Any] | str
+    content_type: str = "application/json"
 
 
 class APIError(ValueError):
@@ -149,11 +156,14 @@ class TokenBadgeAPI:
 
     def handle(self, method: str, path: str, payload: dict[str, Any] | None = None) -> APIResponse:
         try:
-            if method == "GET" and path == "/healthz":
+            clean_path = urlparse(path).path
+            if method == "GET" and clean_path == "/healthz":
                 return APIResponse(200, {"ok": True})
-            if method == "POST" and path == "/v1/challenges":
+            if method == "GET" and clean_path.startswith("/v1/badges/"):
+                return self._get_badge(clean_path)
+            if method == "POST" and clean_path == "/v1/challenges":
                 return self._create_challenge(payload or {})
-            if method == "POST" and path == "/v1/usage-snapshots":
+            if method == "POST" and clean_path == "/v1/usage-snapshots":
                 return self._store_usage_snapshot(payload or {})
             return APIResponse(404, {"error": "not_found"})
         except APIError as exc:
@@ -177,6 +187,19 @@ class TokenBadgeAPI:
         snapshot = validate_usage_snapshot(payload)
         snapshot_id = self.storage.store_usage_snapshot(snapshot)
         return APIResponse(201, {"snapshot_id": snapshot_id, "status": "accepted"})
+
+    def _get_badge(self, path: str) -> APIResponse:
+        github_login = unquote(path.removeprefix("/v1/badges/"))
+        wants_svg = github_login.endswith(".svg")
+        if wants_svg:
+            github_login = github_login.removesuffix(".svg")
+        if not github_login:
+            return APIResponse(400, {"error": "github_login is required"})
+
+        summary = badge_summary_from_record(self.storage.get_badge_grant(github_login))
+        if wants_svg:
+            return APIResponse(200, render_badge_svg(summary), content_type="image/svg+xml")
+        return APIResponse(200, summary)
 
 
 def run_http_server(api: TokenBadgeAPI, *, host: str, port: int) -> None:
@@ -205,9 +228,12 @@ def run_http_server(api: TokenBadgeAPI, *, host: str, port: int) -> None:
             return payload
 
         def _send(self, response: APIResponse) -> None:
-            encoded = json.dumps(response.body, sort_keys=True).encode("utf-8")
+            if response.content_type == "application/json":
+                encoded = json.dumps(response.body, sort_keys=True).encode("utf-8")
+            else:
+                encoded = str(response.body).encode("utf-8")
             self.send_response(response.status_code)
-            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Type", response.content_type)
             self.send_header("Content-Length", str(len(encoded)))
             self.end_headers()
             self.wfile.write(encoded)

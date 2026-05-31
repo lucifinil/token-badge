@@ -17,13 +17,14 @@ usage source.
 
 | Threshold | Badge |
 | ---: | --- |
-| 100,000,000 tokens | Wonder Kid |
-| 1,000,000,000 tokens | AI Smart Boy |
-| 10,000,000,000 tokens | AI Power User |
-| 100,000,000,000 tokens | Context Titan |
+| 100,000,000 tokens | Hot AI Prospect |
+| 500,000,000 tokens | Wonder AI Kid |
+| 1,000,000,000 tokens | Key AI Player |
+| 10,000,000,000 tokens | World-Class AI Player |
 
-Tier names are configuration, not hard-coded product truth. The important invariant is
-that a grant is based on the highest verified total crossing a threshold.
+Tier names salute the old Championship Manager / Football Manager player-role ladder.
+The important invariant is that a public grant is based on the highest accepted
+provider total for the linked GitHub profile.
 
 ## MVP Flow
 
@@ -33,7 +34,7 @@ that a grant is based on the highest verified total crossing a threshold.
 3. Local collector runs `ccusage codex monthly --json`, computes the total, attaches
    the challenge, and signs a usage snapshot with the user's collector key.
 4. Service records the snapshot as Codex subscription usage.
-5. Service grants the highest matching badge to the associated GitHub profile.
+5. Service grants the highest matching badge from the user's highest provider total.
 
 The first implementation is not provider-certified. It should label Codex `ccusage`
 snapshots as `local-self-reported` until Codex exposes a server-side usage API or signed
@@ -103,11 +104,23 @@ Run tests:
 PYTHONPATH=src python3 -m unittest
 ```
 
+## Public Badge
+
+The backend exposes a GitHub-profile-friendly SVG badge:
+
+```markdown
+[![Token Badge](https://token-badge.example.com/v1/badges/<github-login>.svg)](https://token-badge.example.com/v1/badges/<github-login>)
+```
+
+The JSON endpoint at `/v1/badges/<github-login>` explains which provider snapshot is
+currently winning the badge.
+
 ## Repository Map
 
 - `src/token_badge/`: small collector and tiering prototype.
 - `docs/product-brief.md`: product framing and first user experience.
 - `docs/data-model.md`: identity, usage, and badge grant model.
+- `docs/badge-model.md`: tier rationale, profile association, and badge visuals.
 - `docs/deployment.md`: TiDB-backed upload API setup and metadata boundary.
 - `docs/trust-model.md`: anti-fooling model and its limits.
 - `docs/roadmap.md`: build sequence from local prototype to badge service.

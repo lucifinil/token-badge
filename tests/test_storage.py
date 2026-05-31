@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from token_badge.storage import get_tidb_dsn, parse_mysql_dsn
+from token_badge.storage import challenge_matches_snapshot, get_tidb_dsn, parse_mysql_dsn
 
 
 class StorageConfigTest(unittest.TestCase):
@@ -25,7 +25,25 @@ class StorageConfigTest(unittest.TestCase):
         self.assertEqual(config["password"], "pass")
         self.assertEqual(config["database"], "token_badge")
 
+    def test_challenge_metadata_must_match_snapshot(self) -> None:
+        challenge = {
+            "collector_installation_id": "collector-1",
+            "github_login": "octocat",
+            "github_node_id": "U_123",
+        }
+
+        self.assertTrue(challenge_matches_snapshot(challenge, dict(challenge)))
+        self.assertFalse(
+            challenge_matches_snapshot(
+                challenge,
+                {
+                    "collector_installation_id": "collector-1",
+                    "github_login": "someone-else",
+                    "github_node_id": "U_123",
+                },
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -45,7 +45,7 @@ One collected total at a point in time.
 | `id` | Internal stable UUID. |
 | `member_id` | Foreign key to `members.id`. |
 | `provider_identity_id` | Foreign key to `provider_identities.id`. |
-| `provider` | `codex` first. |
+| `provider` | `codex` or `claude` today; more providers later. |
 | `usage_kind` | `subscription`. |
 | `source_tool` | Example: `ccusage codex monthly --json`. |
 | `total_tokens` | Normalized total used for badge tiering. |
@@ -75,22 +75,30 @@ Materialized badge state.
 
 | Field | Notes |
 | --- | --- |
-| `id` | Internal stable UUID. |
-| `member_id` | Foreign key to `members.id`. |
-| `tier_id` | Highest tier granted at the time. |
-| `usage_snapshot_id` | Evidence snapshot that crossed the threshold. |
+| `identity_key` | Profile-facing identity key, currently based on GitHub login. |
+| `github_login` | GitHub login used for the public badge URL. |
+| `github_node_id` | Stable GitHub ID when available from enrollment. |
+| `tier_name` | Highest tier granted at the time. |
+| `tier_threshold` | Token threshold crossed by the winning snapshot. |
+| `winning_provider` | Provider whose snapshot currently grants the badge. |
+| `winning_snapshot_id` | Evidence snapshot that crossed the threshold. |
+| `winning_total_tokens` | Highest accepted provider total for this identity. |
 | `trust_level` | Copied from the evidence snapshot. |
 | `granted_at` | Timestamp. |
+| `updated_at` | Last replacement timestamp when a higher provider total wins. |
 
 ## Grant Rule
 
-For each member and usage scope, find the maximum `total_tokens` from accepted
-snapshots. Grant the highest active tier where:
+For each GitHub identity and usage scope, find the maximum `total_tokens` from accepted
+provider snapshots. Grant the highest active tier where:
 
 ```text
 usage_snapshots.total_tokens >= badge_tiers.threshold_tokens
 ```
 
-Do not downgrade badges automatically if a future provider parser changes. Instead,
-record superseding grants or mark older evidence as disputed.
+Example: if `lucifinil` uploads 1.1B Codex tokens and 164M Claude Code tokens, both
+snapshots are stored, but the public badge grant points at the Codex snapshot because
+1.1B is higher.
 
+Do not downgrade badges automatically if a future provider parser changes or a lower
+provider total arrives. A higher future provider total can replace the grant.
