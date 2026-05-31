@@ -28,7 +28,7 @@ class BadgeGrantTest(unittest.TestCase):
         self.assertIsNone(badge_grant_from_snapshot(snapshot(99_999_999), "snapshot-1"))
 
     def test_snapshot_at_tier_creates_grant(self) -> None:
-        grant = badge_grant_from_snapshot(snapshot(500_000_000, "claude"), "snapshot-1")
+        grant = badge_grant_from_snapshot(snapshot(1_000_000_000, "claude"), "snapshot-1")
 
         self.assertEqual(grant.tier.name, "Wonder AI Kid")
         self.assertEqual(grant.winning_provider, "claude")
