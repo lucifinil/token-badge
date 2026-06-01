@@ -26,6 +26,14 @@ class SkillTest(unittest.TestCase):
         self.assertTrue(response.content_type.startswith("text/markdown"))
         self.assertIn("Token Badge — Agent Setup Skill", response.body)
 
+    def test_skill_names_exact_install_source_and_fallback(self) -> None:
+        self.assertIn(
+            "uvx --from git+https://github.com/lucifinil/token-badge token-badge --help",
+            SKILL_MARKDOWN,
+        )
+        self.assertIn("repo-root `SKILL.md` as the canonical", SKILL_MARKDOWN)
+        self.assertIn("not a Python package index or wheel URL", SKILL_MARKDOWN)
+
 
 if __name__ == "__main__":
     unittest.main()

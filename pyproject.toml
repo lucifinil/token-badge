@@ -16,6 +16,11 @@ dependencies = [
   "PyMySQL>=1.1",
 ]
 
+[project.urls]
+Homepage = "https://token-badge.vercel.app"
+Repository = "https://github.com/lucifinil/token-badge"
+Issues = "https://github.com/lucifinil/token-badge/issues"
+
 [project.scripts]
 token-badge = "token_badge.cli:main"
 
