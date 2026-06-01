@@ -41,8 +41,8 @@ Wonder AI Kid, Key AI Player, and World-Class AI Player come from.
 Token Badge is a deployed service. Users do not run anything by hand — they give their
 coding agent (Claude Code or Codex) one statement:
 
-> **"Read https://token-badge.vercel.app/SKILL.md and follow the instructions to
-> install Token Badge to get data for token consumption and badge."**
+> **"Read https://token-badge.vercel.app/SKILL.md and follow the instructions for
+> token consumption and badge."**
 
 The service serves agent-followable instructions at `GET /SKILL.md`. The agent reads
 them, detects whether it is running from Codex or Claude Code, routes to the matching
