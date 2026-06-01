@@ -12,10 +12,11 @@ look like for the wider consumer audience. Then I found `ccusage`, checked my ow
 consumption, and immediately wanted to turn those totals into fun public tiers and
 badges.
 
-The tier names are a small football-memory salute. On Children's Day, with soccer
-season in the air and the 2026 World Cup around the corner, old Championship Manager 4 /
-03-04 memories came back. The badge ladder borrows the language of football talent:
-Hot AI Prospect, Wonder AI Kid, Key AI Player, and World-Class AI Player.
+On Children's Day 2026, with PSG having lifted the UEFA Champions League trophy the
+night before and the 2026 World Cup around the corner, this became a small
+football-memory salute too. I wanted to nod to my old-kid memories of CM4 / 03-04,
+where players were described by tiers and promise. That is where Hot AI Prospect,
+Wonder AI Kid, Key AI Player, and World-Class AI Player come from.
 
 ## Start From Your AI Agent
 
