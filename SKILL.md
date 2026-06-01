@@ -10,6 +10,18 @@ Use the origin you fetched this file from as `TOKEN_BADGE_URL`. For example, if 
 read `https://token-badge.vercel.app/SKILL.md`, then
 `TOKEN_BADGE_URL=https://token-badge.vercel.app`.
 
+If hosted `https://token-badge.vercel.app/SKILL.md` cannot resolve from your sandbox
+but you have this repository checkout, use the repo-root `SKILL.md` as the canonical
+fallback and still set `TOKEN_BADGE_URL=https://token-badge.vercel.app`.
+
+Do not try to install Python code from `https://token-badge.vercel.app`; that host is
+the Token Badge API and landing page, not a Python package index or wheel URL. The
+collector install source is the GitHub repository:
+
+```bash
+uvx --from git+https://github.com/lucifinil/token-badge token-badge --help
+```
+
 ## 1. Check prerequisites
 
 Run and confirm each is available; if one is missing, tell the user how to install it
@@ -21,6 +33,10 @@ and stop:
   profile badge).
 - `uvx --version` (from `uv`) — runs the Token Badge collector package without a local
   repo checkout or direct `python3 -m ...` command.
+
+If `uvx --from git+https://github.com/lucifinil/token-badge token-badge --help` cannot
+install because the repository is not visible, tell the user the GitHub repository must
+be public or accessible to the current GitHub session before continuing.
 
 ## 2. Detect the provider
 
