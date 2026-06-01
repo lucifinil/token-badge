@@ -27,6 +27,9 @@ class ProfilePageRenderTest(unittest.TestCase):
         self.assertIn("/v1/badges/lucifinil.svg", page)
         self.assertIn("one of the first 100", page)
         self.assertIn("World-Class AI Player", page)
+        self.assertIn("https://github.com/lucifinil/lucifinil", page)
+        self.assertIn("special GitHub repository", page)
+        self.assertIn("install Token Badge to get data", page)
 
     def test_no_badge_page_renders_gracefully(self) -> None:
         summary = {
