@@ -8,6 +8,7 @@ from typing import Any, Protocol
 from urllib.parse import unquote, urlparse
 
 from token_badge.badges import badge_summary_from_record, render_badge_svg
+from token_badge.profile_page import render_profile_html
 from token_badge.rankings import ConsumptionRanking, ranking_message
 from token_badge.skill import SKILL_MARKDOWN
 
@@ -170,6 +171,8 @@ class TokenBadgeAPI:
                 return self._get_badge(clean_path)
             if method == "GET" and clean_path.startswith("/v1/rankings/"):
                 return self._get_ranking(clean_path)
+            if method == "GET" and clean_path.startswith("/u/"):
+                return self._get_profile_page(clean_path)
             if method == "POST" and clean_path == "/v1/challenges":
                 return self._create_challenge(payload or {})
             if method == "POST" and clean_path == "/v1/usage-snapshots":
@@ -220,6 +223,18 @@ class TokenBadgeAPI:
         body["github_login"] = github_login
         body["message"] = ranking_message(ranking)
         return APIResponse(200, body)
+
+    def _get_profile_page(self, path: str) -> APIResponse:
+        github_login = unquote(path.removeprefix("/u/")).strip("/")
+        if not github_login:
+            return APIResponse(400, {"error": "github_login is required"})
+
+        summary = badge_summary_from_record(self.storage.get_badge_grant(github_login))
+        ranking = self.storage.get_consumption_ranking(github_login)
+        ranking_body = ranking.to_dict()
+        ranking_body["message"] = ranking_message(ranking)
+        html_page = render_profile_html(github_login, summary, ranking_body)
+        return APIResponse(200, html_page, content_type="text/html; charset=utf-8")
 
 
 def run_http_server(api: TokenBadgeAPI, *, host: str, port: int) -> None:
