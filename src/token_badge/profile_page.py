@@ -37,6 +37,9 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .cta h3 {{ font-size:14px; margin:0 0 8px; }}
   .cta code {{ display:block; background:#f6f8fa; border:1px solid var(--line); border-radius:8px;
     padding:12px 14px; font-size:12.5px; color:#1f2328; white-space:pre-wrap; line-height:1.5; }}
+  .profile-repo {{ margin-top:18px; padding-top:16px; border-top:1px solid var(--line);
+    font-size:13px; color:var(--muted); text-align:left; line-height:1.45; }}
+  .profile-repo a {{ color:var(--accent); font-weight:700; text-decoration:none; }}
   .foot {{ margin-top:18px; font-size:12px; color:var(--muted); }}
   .foot a {{ color:var(--muted); }}
 </style>
@@ -57,7 +60,12 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     </div>
     <div class="cta">
       <h3>Get your own badge</h3>
-      <code id="cta">Read /SKILL.md and follow the instructions to install and configure Token Badge for Claude Code.</code>
+      <code id="cta">Read /SKILL.md and follow the instructions to install Token Badge to get data for token consumption and badge.</code>
+    </div>
+    <div class="profile-repo">
+      Profile README repo:
+      <a href="https://github.com/{login}/{login}">{login}/{login}</a>.
+      This special GitHub repository controls the README that can appear on @{login}'s public profile.
     </div>
     <div class="foot">
       {trust} · <a href="/v1/badges/{login}">raw badge data</a>
@@ -66,7 +74,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   <script>
     // Make the bootstrap statement host-aware regardless of domain (vercel.app or token-badge.ai).
     document.getElementById("cta").textContent =
-      "Read " + location.origin + "/SKILL.md and follow the instructions to install and configure Token Badge for Claude Code.";
+      "Read " + location.origin + "/SKILL.md and follow the instructions to install Token Badge to get data for token consumption and badge.";
   </script>
 </body>
 </html>
