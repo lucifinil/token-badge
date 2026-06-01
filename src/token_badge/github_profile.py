@@ -86,12 +86,20 @@ class GhCliRunner:
 def badge_markdown(github_login: str, badge_base_url: str) -> str:
     base_url = badge_base_url.rstrip("/")
     badge_url = f"{base_url}/v1/badges/{github_login}.svg"
-    target_url = f"{base_url}/v1/badges/{github_login}"
+    target_url = profile_landing_url(github_login, badge_base_url)
     return f"[![Token Badge]({badge_url})]({target_url})"
+
+
+def profile_landing_url(github_login: str, badge_base_url: str) -> str:
+    return f"{badge_base_url.rstrip('/')}/u/{github_login}"
 
 
 def badge_svg_url(github_login: str, badge_base_url: str) -> str:
     return f"{badge_base_url.rstrip('/')}/v1/badges/{github_login}.svg"
+
+
+def badge_explanation_markdown(github_login: str, badge_base_url: str) -> str:
+    return f"Token Badge profile: [what this badge means]({profile_landing_url(github_login, badge_base_url)})"
 
 
 def badge_block(github_login: str, badge_base_url: str) -> str:
@@ -99,6 +107,7 @@ def badge_block(github_login: str, badge_base_url: str) -> str:
         [
             START_MARKER,
             badge_markdown(github_login, badge_base_url),
+            badge_explanation_markdown(github_login, badge_base_url),
             END_MARKER,
         ]
     )
@@ -230,8 +239,6 @@ class GitHubProfileClient:
             "/user/repos",
             "--raw-field",
             f"name={github_login}",
-            "--raw-field",
-            "description=Token Badge profile",
             "--field",
             "auto_init=true",
             "--field",

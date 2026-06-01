@@ -63,7 +63,7 @@ where their consumption lands in the community:
   line instead of a noisy percentile:
 
   ```text
-  Total consumption: 150,000,000 tokens (claude)
+  Total consumption for badge/ranking: 150,000,000 tokens
   Badge tier: Hot AI Prospect
   You're one of the first 100 AI adopters to upload — yay! Check back later for your percentile.
   ```
@@ -72,7 +72,7 @@ where their consumption lands in the community:
   everyone else:
 
   ```text
-  Total consumption: 12,400,000,000 tokens (codex)
+  Total consumption for badge/ranking: 12,400,000,000 tokens
   Badge tier: Key AI Player
   Your consumption has beat 87% of other AI adopters.
   ```
@@ -104,7 +104,9 @@ get the summary without the prompt.
 
 At the end of a successful `start` run, the user should see:
 
-- Total token consumption.
+- Total token consumption used for badge/ranking. If the current provider run is lower
+  because the same GitHub profile already uploaded another agent, the output explains
+  that the badge uses the highest accepted provider total.
 - Earned tier/badge plus the full tier standard.
 - Public Token Badge landing page, for example `https://token-badge.vercel.app/u/<login>`.
 - Special profile repository link, for example `https://github.com/<login>/<login>`.
@@ -211,11 +213,13 @@ PYTHONPATH=src python3 -m unittest
 The backend exposes a GitHub-profile-friendly SVG badge:
 
 ```markdown
-[![Token Badge](https://token-badge.example.com/v1/badges/<github-login>.svg)](https://token-badge.example.com/v1/badges/<github-login>)
+[![Token Badge](https://token-badge.example.com/v1/badges/<github-login>.svg)](https://token-badge.example.com/u/<github-login>)
+Token Badge profile: [what this badge means](https://token-badge.example.com/u/<github-login>)
 ```
 
-The JSON endpoint at `/v1/badges/<github-login>` explains which provider snapshot is
-currently winning the badge.
+The GitHub profile README automation installs the badge image plus the landing-page
+explanation link. The JSON endpoint at `/v1/badges/<github-login>` remains available for
+raw badge data.
 
 Install or refresh the badge block in the authenticated user's GitHub profile README:
 

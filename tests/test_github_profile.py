@@ -58,7 +58,7 @@ class GitHubProfileTest(unittest.TestCase):
         self.assertEqual(
             markdown,
             "[![Token Badge](https://token.example.com/v1/badges/octocat.svg)]"
-            "(https://token.example.com/v1/badges/octocat)",
+            "(https://token.example.com/u/octocat)",
         )
 
     def test_profile_visibility_detects_rendered_badge_url(self) -> None:
@@ -133,6 +133,8 @@ class GitHubProfileTest(unittest.TestCase):
         self.assertTrue(update.changed)
         self.assertTrue(update.dry_run)
         self.assertIn("/v1/badges/octocat.svg", update.content)
+        self.assertIn("/u/octocat", update.content)
+        self.assertIn("what this badge means", update.content)
         self.assertFalse(any("--method" in call for call in runner.calls))
 
     def test_client_commits_marker_update_to_profile_readme(self) -> None:
@@ -172,6 +174,7 @@ class GitHubProfileTest(unittest.TestCase):
         content_field = next(field for field in put_calls[0] if field.startswith("content="))
         decoded = base64.b64decode(content_field.removeprefix("content=")).decode("utf-8")
         self.assertIn("/v1/badges/octocat.svg", decoded)
+        self.assertIn("/u/octocat", decoded)
 
     def test_client_creates_missing_profile_readme(self) -> None:
         runner = FakeRunner(
@@ -215,7 +218,7 @@ class GitHubProfileTest(unittest.TestCase):
                 (("api", "/user"), json_response({"login": "octocat"})),
                 (("api", "/repos/octocat/octocat"), GitHubProfileError("HTTP 404 Not Found")),
                 (
-                    ("api", "--method", "POST", "/user/repos", "--raw-field", ANY, "--raw-field", ANY, "--field", ANY, "--field", ANY),
+                    ("api", "--method", "POST", "/user/repos", "--raw-field", ANY, "--field", ANY, "--field", ANY),
                     json_response({"default_branch": "main"}),
                 ),
                 (("api", "/repos/octocat/octocat/contents/README.md"), readme_response("# octocat\n", sha="sha-1")),
@@ -248,6 +251,8 @@ class GitHubProfileTest(unittest.TestCase):
         self.assertTrue(update.repo_created)
         self.assertEqual(update.commit_sha, "commit-1")
         self.assertTrue(any(call[:4] == ("api", "--method", "POST", "/user/repos") for call in runner.calls))
+        create_call = next(call for call in runner.calls if call[:4] == ("api", "--method", "POST", "/user/repos"))
+        self.assertFalse(any(str(field).startswith("description=") for field in create_call))
 
     def test_client_does_not_create_repository_without_opt_in(self) -> None:
         runner = FakeRunner(
