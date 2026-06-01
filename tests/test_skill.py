@@ -26,13 +26,15 @@ class SkillTest(unittest.TestCase):
         self.assertTrue(response.content_type.startswith("text/markdown"))
         self.assertIn("Token Badge — Agent Setup Skill", response.body)
 
-    def test_skill_names_exact_install_source_and_fallback(self) -> None:
-        self.assertIn(
-            "uvx --from git+https://github.com/lucifinil/token-badge token-badge --help",
-            SKILL_MARKDOWN,
-        )
-        self.assertIn("repo-root `SKILL.md` as the canonical", SKILL_MARKDOWN)
-        self.assertIn("not a Python package index or wheel URL", SKILL_MARKDOWN)
+    def test_skill_uses_local_ccusage_curl_flow_without_package_install(self) -> None:
+        # The flow must run with ccusage + curl only — no Python package download/run.
+        self.assertIn("ccusage", SKILL_MARKDOWN)
+        self.assertIn("/v1/challenges", SKILL_MARKDOWN)
+        self.assertIn("/v1/usage-snapshots", SKILL_MARKDOWN)
+        self.assertIn("nothing to install", SKILL_MARKDOWN)
+        # No instruction to run the packaged collector via uvx / python -m.
+        self.assertNotIn("uvx --from", SKILL_MARKDOWN)
+        self.assertNotIn("python3 -m token_badge", SKILL_MARKDOWN)
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ from typing import Any, Protocol
 from urllib.parse import unquote, urlparse
 
 from token_badge.badges import badge_summary_from_record, render_badge_svg
+from token_badge.evidence import build_usage_evidence, hash_payload
 from token_badge.profile_page import render_profile_html
 from token_badge.rankings import ConsumptionRanking, ranking_message
 from token_badge.skill import SKILL_MARKDOWN
@@ -137,8 +138,11 @@ def validate_usage_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
     if trust_level not in ALLOWED_TRUST_LEVELS:
         raise APIError(400, f"unsupported trust_level: {trust_level}")
 
-    report_hash = _required_str(payload, "report_hash")
-    if not report_hash.startswith("sha256:"):
+    # report_hash is optional: agents uploading with plain curl omit it and the service
+    # computes it server-side (see _store_usage_snapshot). If a client does send one, it
+    # must look like a sha256 digest.
+    report_hash = _optional_str(payload, "report_hash")
+    if report_hash is not None and not report_hash.startswith("sha256:"):
         raise APIError(400, "report_hash must be a sha256 hash")
 
     return {
@@ -147,7 +151,7 @@ def validate_usage_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
         "github_login": _optional_str(payload, "github_login"),
         "github_node_id": _optional_str(payload, "github_node_id"),
         "provider": provider,
-        "raw_totals": validate_raw_totals(payload.get("raw_totals")),
+        "raw_totals": validate_raw_totals(payload.get("raw_totals") or {}),
         "report_hash": report_hash,
         "source": _required_str(payload, "source"),
         "total_tokens": _required_int(payload, "total_tokens"),
@@ -197,6 +201,20 @@ class TokenBadgeAPI:
 
     def _store_usage_snapshot(self, payload: dict[str, Any]) -> APIResponse:
         snapshot = validate_usage_snapshot(payload)
+        if snapshot["report_hash"] is None:
+            snapshot["report_hash"] = hash_payload(
+                build_usage_evidence(
+                    provider=snapshot["provider"],
+                    usage_kind=snapshot["usage_kind"],
+                    source=snapshot["source"],
+                    trust_level=snapshot["trust_level"],
+                    total_tokens=snapshot["total_tokens"],
+                    challenge_nonce=snapshot["challenge_nonce"],
+                    collector_installation_id=snapshot["collector_installation_id"],
+                    github_login=snapshot["github_login"],
+                    raw_totals=snapshot["raw_totals"],
+                )
+            )
         snapshot_id = self.storage.store_usage_snapshot(snapshot)
         return APIResponse(201, {"snapshot_id": snapshot_id, "status": "accepted"})
 
