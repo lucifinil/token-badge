@@ -4,6 +4,7 @@ import argparse
 import json
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import quote
 
 from token_badge.ccusage import CcusageError, collect_provider_usage
 from token_badge.api import TokenBadgeAPI, run_http_server
@@ -42,8 +43,34 @@ def _tier_payload(total_tokens: int) -> dict[str, Any]:
     }
 
 
+def _tier_rows() -> list[dict[str, Any]]:
+    return [
+        {
+            "threshold": tier.threshold,
+            "name": tier.name,
+            "description": tier.description,
+        }
+        for tier in DEFAULT_TIERS
+    ]
+
+
 def _print_json(payload: dict[str, Any]) -> None:
     print(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def _public_profile_url(base_url: str, github_login: str) -> str:
+    return f"{base_url.rstrip('/')}/u/{quote(github_login, safe='')}"
+
+
+def _profile_repository_url(github_login: str) -> str:
+    escaped_login = quote(github_login, safe="")
+    return f"https://github.com/{escaped_login}/{escaped_login}"
+
+
+def _print_tier_standard() -> None:
+    print("Tier standard:")
+    for tier in DEFAULT_TIERS:
+        print(f"  {tier.threshold:>15,} tokens  {tier.name}")
 
 
 def _profile_visibility_payload(visibility: ProfileVisibility) -> dict[str, Any]:
@@ -240,14 +267,7 @@ def run_claude(args: argparse.Namespace) -> int:
 
 
 def run_tiers(args: argparse.Namespace) -> int:
-    rows = [
-        {
-            "threshold": tier.threshold,
-            "name": tier.name,
-            "description": tier.description,
-        }
-        for tier in DEFAULT_TIERS
-    ]
+    rows = _tier_rows()
     if args.json:
         _print_json({"tiers": rows})
         return 0
@@ -442,11 +462,16 @@ def run_start(args: argparse.Namespace, confirm=_prompt_yes_no) -> int:
         return 1
 
     earned = earned_tier(snapshot.total_tokens)
+    public_profile_url = _public_profile_url(args.upload_url, github_login)
+    profile_repository_url = _profile_repository_url(github_login)
     summary = {
         "github_login": github_login,
         "provider": snapshot.provider,
         "total_tokens": snapshot.total_tokens,
         "earned_badge": None if earned is None else earned.name,
+        "badge_tiers": _tier_rows(),
+        "public_profile_url": public_profile_url,
+        "profile_repository_url": profile_repository_url,
         "ranking": ranking,
     }
 
@@ -455,6 +480,12 @@ def run_start(args: argparse.Namespace, confirm=_prompt_yes_no) -> int:
     else:
         print(f"Total consumption: {snapshot.total_tokens:,} tokens ({snapshot.provider})")
         print(f"Badge tier: {earned.name if earned else 'None yet'}")
+        _print_tier_standard()
+        print(f"Public page: {public_profile_url}")
+        print(
+            "GitHub profile repo: "
+            f"{profile_repository_url} (special README repo GitHub can show on @{github_login}'s profile)"
+        )
         print(ranking.get("message", ""))
 
     # --install-badge installs without prompting (for agents driving the flow);
@@ -482,6 +513,10 @@ def run_start(args: argparse.Namespace, confirm=_prompt_yes_no) -> int:
 
     if update.repo_created:
         print(f"Profile repository: created ({update.repository})")
+        print(
+            "Manual step may be required: open "
+            f"{profile_repository_url} and click \"Share to Profile\" if GitHub shows that banner."
+        )
     action = "updated" if update.changed else "already up to date"
     print(f"Profile badge: {action} ({update.repository})")
     _print_profile_visibility(profile_visibility_for_badge(update.github_login, badge_base_url))
@@ -554,8 +589,8 @@ def build_parser() -> argparse.ArgumentParser:
     start.add_argument(
         "--provider",
         choices=("codex", "claude"),
-        default="claude",
-        help="Subscription agent to collect usage from (default: claude)",
+        required=True,
+        help="Subscription agent to collect usage from; agents should pass codex or claude after detecting their runtime",
     )
     start.add_argument("--github", help="GitHub login; defaults to the authenticated local GitHub user")
     start.add_argument("--github-node-id", help="Stable GitHub node_id from backend enrollment")
