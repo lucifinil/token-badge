@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import io
 import unittest
 from unittest import mock
 
@@ -123,6 +124,21 @@ class StartFlowTest(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertFalse(FakeProfileClient.instances[0].installed)
+
+    def test_start_parser_requires_explicit_provider(self) -> None:
+        parser = cli.build_parser()
+
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                parser.parse_args(
+                    [
+                        "start",
+                        "--collector-id",
+                        "collector-1",
+                        "--upload-url",
+                        "https://token-badge.example.com",
+                    ]
+                )
 
 
 if __name__ == "__main__":

@@ -9,13 +9,14 @@ usage source.
 Token Badge is a deployed service. Users do not run anything by hand — they give their
 coding agent (Claude Code or Codex) one statement:
 
-> **"Read https://&lt;your-token-badge-host&gt;/SKILL.md and follow the instructions to
-> install and configure Token Badge for Claude Code."**
+> **"Read https://token-badge.vercel.app/SKILL.md and follow the instructions to
+> install Token Badge to get data for token consumption and badge."**
 
 The service serves agent-followable instructions at `GET /SKILL.md`. The agent reads
-them, collects the user's usage locally via `ccusage`, uploads it, reports the badge
-tier and percentile, and — only with the user's consent — adds the badge to their GitHub
-profile. The canonical copy lives in [SKILL.md](SKILL.md).
+them, detects whether it is running from Codex or Claude Code, routes to the matching
+`ccusage` command, uploads the usage, reports the badge tier and percentile, and — only
+with the user's consent — adds the badge to their GitHub profile. The canonical copy
+lives in [SKILL.md](SKILL.md).
 
 ## First Scope
 
@@ -72,16 +73,29 @@ below yours. It is served from `GET /v1/rankings/<github-login>` and returned by
 consumption, badge tier, and percentile, then asks before touching your GitHub profile:
 
 ```bash
-PYTHONPATH=src python3 -m token_badge.cli start \
-  --provider claude \
+uvx --from git+https://github.com/lucifinil/token-badge token-badge start \
+  --provider <codex|claude> \
   --collector-id <collector-installation-id> \
-  --upload-url https://token-badge.example.com
+  --upload-url https://token-badge.vercel.app
 ```
+
+`uvx` is still part of the current SaaS flow because token consumption is read from the
+user's local `ccusage` data, not from the hosted backend. It avoids asking users to
+clone this repository or run `python3 -m ...` from a checkout.
 
 If you answer yes at the prompt, `start` creates the special `<login>/<login>` profile
 repository when it does not exist yet and installs the badge in its README. If you
 answer no, nothing is written to GitHub — your usage is still recorded. Add `--json` to
 get the summary without the prompt.
+
+At the end of a successful `start` run, the user should see:
+
+- Total token consumption.
+- Earned tier/badge plus the full tier standard.
+- Public Token Badge landing page, for example `https://token-badge.vercel.app/u/<login>`.
+- Special profile repository link, for example `https://github.com/<login>/<login>`.
+- If the profile repository was newly created, a reminder to click `Share to Profile`
+  in GitHub's UI if GitHub has not made it visible yet.
 
 ## MVP Flow
 
@@ -98,9 +112,12 @@ The first implementation is not provider-certified. It should label Codex `ccusa
 snapshots as `local-self-reported` until Codex exposes a server-side usage API or signed
 export.
 
-## Local Prototype
+## Local Development
 
-Install local collector dependencies:
+These commands are for developing the collector from this checkout. SaaS users should
+use the agent-driven `uvx` flow above.
+
+Install local development dependencies:
 
 ```bash
 npm install -g ccusage

@@ -7,7 +7,8 @@ user's consent, add the badge to their GitHub profile.
 ## 0. Base URL
 
 Use the origin you fetched this file from as `TOKEN_BADGE_URL`. For example, if you
-read `https://tokenbadge.ai/SKILL.md`, then `TOKEN_BADGE_URL=https://tokenbadge.ai`.
+read `https://token-badge.vercel.app/SKILL.md`, then
+`TOKEN_BADGE_URL=https://token-badge.vercel.app`.
 
 ## 1. Check prerequisites
 
@@ -18,36 +19,49 @@ and stop:
   missing, install it with `npm install -g ccusage`.
 - `gh auth status` — an authenticated GitHub CLI (needed only if the user wants the
   profile badge).
-- `uvx --version` (from `uv`) or `pipx --version` — used to run the collector without a
-  clone.
+- `uvx --version` (from `uv`) — runs the Token Badge collector package without a local
+  repo checkout or direct `python3 -m ...` command.
 
-## 2. Ask which provider
+## 2. Detect the provider
 
-Ask the user whether to measure `claude` (Claude Code) or `codex` usage. Default to
-`claude` if they have no preference.
+Set `TOKEN_BADGE_PROVIDER` from the agent currently running this skill:
 
-## 3. Collect, upload, and rank (report only)
+- If you are Codex, use `codex`; the collector will run `ccusage codex monthly --json`.
+- If you are Claude Code, use `claude`; the collector will run `ccusage claude monthly --json`.
+- If you cannot confidently tell which agent is running, ask the user. Do not default
+  to either provider.
+
+## 3. Set collector identity
+
+Set a stable collector ID for this GitHub account:
+
+```bash
+TOKEN_BADGE_COLLECTOR_ID="${TOKEN_BADGE_COLLECTOR_ID:-github:$(gh api /user --jq .node_id)}"
+```
+
+## 4. Collect, upload, and rank (report only)
 
 Run the collector in report-only mode and show the user the result:
 
 ```bash
 uvx --from git+https://github.com/lucifinil/token-badge token-badge start \
-  --provider <provider> \
+  --provider "$TOKEN_BADGE_PROVIDER" \
+  --collector-id "$TOKEN_BADGE_COLLECTOR_ID" \
   --upload-url "$TOKEN_BADGE_URL" \
   --json
 ```
-
-(If you use `pipx`, replace the `uvx --from git+... token-badge` prefix with
-`pipx run --spec git+https://github.com/lucifinil/token-badge token-badge`.)
 
 Parse the JSON and report to the user, in plain language:
 
 - `total_tokens` — their total subscription-agent consumption.
 - `earned_badge` — the badge tier they have earned (or "none yet").
+- `badge_tiers` — the public tiering standard.
+- `public_profile_url` — the Token Badge landing page for this GitHub login.
+- `profile_repository_url` — the special GitHub profile repository.
 - `ranking.message` — either "you are one of the first 100 adopters" or
   "your consumption has beat XX% of other AI adopters".
 
-## 4. Ask before touching GitHub
+## 5. Ask before touching GitHub
 
 Ask the user: "Create your GitHub profile repository (if needed) and add the Token
 Badge to it?"
@@ -57,18 +71,26 @@ Badge to it?"
 
 ```bash
 uvx --from git+https://github.com/lucifinil/token-badge token-badge start \
-  --provider <provider> \
+  --provider "$TOKEN_BADGE_PROVIDER" \
+  --collector-id "$TOKEN_BADGE_COLLECTOR_ID" \
   --upload-url "$TOKEN_BADGE_URL" \
   --install-badge
 ```
 
 This creates the special `<login>/<login>` profile repository when it does not exist
-and installs the badge in its README.
+and installs the badge in its README. If the repository was newly created, tell the
+user they may need to open the printed GitHub repository URL and click `Share to
+Profile` in the UI before GitHub shows the README publicly.
 
-## 5. Confirm
+## 6. Confirm
 
-Tell the user their badge tier and percentile, and show the badge markdown so they can
-reuse it anywhere:
+Tell the user all of the following:
+
+- Their total token consumption.
+- Their earned tier/badge and the tiering standard.
+- Their public Token Badge landing page.
+- Their special GitHub profile repository link and any `Share to Profile` action needed.
+- The badge markdown, so they can reuse it anywhere:
 
 ```markdown
 [![Token Badge]($TOKEN_BADGE_URL/v1/badges/<login>.svg)]($TOKEN_BADGE_URL/v1/badges/<login>)
