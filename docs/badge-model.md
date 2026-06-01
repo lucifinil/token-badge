@@ -66,7 +66,8 @@ GET /v1/badges/<github-login>.svg
 The profile README points at the SVG endpoint:
 
 ```markdown
-[![Token Badge](https://token-badge.example.com/v1/badges/lucifinil.svg)](https://token-badge.example.com/v1/badges/lucifinil)
+[![Token Badge](https://token-badge.example.com/v1/badges/lucifinil.svg)](https://token-badge.example.com/u/lucifinil)
+Token Badge profile: [what this badge means](https://token-badge.example.com/u/lucifinil)
 ```
 
 The local automation uses the existing GitHub connection first. It resolves the
@@ -75,7 +76,8 @@ authenticated GitHub user with `gh`, reads the special profile repository
 
 ```markdown
 <!-- token-badge:start -->
-[![Token Badge](https://token-badge.example.com/v1/badges/lucifinil.svg)](https://token-badge.example.com/v1/badges/lucifinil)
+[![Token Badge](https://token-badge.example.com/v1/badges/lucifinil.svg)](https://token-badge.example.com/u/lucifinil)
+Token Badge profile: [what this badge means](https://token-badge.example.com/u/lucifinil)
 <!-- token-badge:end -->
 ```
 

@@ -64,13 +64,21 @@ uvx --from git+https://github.com/lucifinil/token-badge token-badge start \\
 
 Parse the JSON and report to the user, in plain language:
 
-- `total_tokens` — their total subscription-agent consumption.
-- `earned_badge` — the badge tier they have earned (or "none yet").
+- `total_tokens` / `profile_total_tokens` — the total used for the public badge and
+  ranking. This is the highest accepted provider total for this GitHub profile across
+  all uploaded agents.
+- `current_provider_total_tokens` — the total from the provider run you just uploaded.
+- `earned_badge` — the badge tier they have earned (or "none yet"), based on
+  `profile_total_tokens`.
 - `badge_tiers` — the public tiering standard.
 - `public_profile_url` — the Token Badge landing page for this GitHub login.
 - `profile_repository_url` — the special GitHub profile repository.
 - `ranking.message` — either "you are one of the first 100 adopters" or
   "your consumption has beat XX% of other AI adopters".
+- If `current_provider_total_tokens` differs from `profile_total_tokens`, explain that
+  this is expected when the same GitHub profile has uploaded multiple agents. Do not
+  call it a discrepancy: the badge and ranking intentionally use the highest accepted
+  provider total.
 
 ## 5. Ask before touching GitHub
 
@@ -104,6 +112,7 @@ Tell the user all of the following:
 - The badge markdown, so they can reuse it anywhere:
 
 ```markdown
-[![Token Badge]($TOKEN_BADGE_URL/v1/badges/<login>.svg)]($TOKEN_BADGE_URL/v1/badges/<login>)
+[![Token Badge]($TOKEN_BADGE_URL/v1/badges/<login>.svg)]($TOKEN_BADGE_URL/u/<login>)
+Token Badge profile: [what this badge means]($TOKEN_BADGE_URL/u/<login>)
 ```
 """

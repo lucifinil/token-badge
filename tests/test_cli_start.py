@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import io
+import json
 import unittest
 from unittest import mock
 
@@ -124,6 +125,30 @@ class StartFlowTest(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertFalse(FakeProfileClient.instances[0].installed)
+
+    def test_json_uses_profile_total_for_badge_when_multiple_providers_exist(self) -> None:
+        self.snapshot = UsageSnapshot(
+            provider="claude",
+            usage_kind="subscription",
+            source="ccusage claude monthly --json",
+            total_tokens=184_000_000,
+            raw_totals={"totalTokens": 184_000_000},
+        )
+        self.ranking["total_tokens"] = 1_170_000_000
+
+        stdout = io.StringIO()
+        with self._patched_collaborators():
+            with contextlib.redirect_stdout(stdout):
+                code = cli.run_start(start_args(json=True), confirm=lambda _question: False)
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["current_provider_total_tokens"], 184_000_000)
+        self.assertEqual(payload["profile_total_tokens"], 1_170_000_000)
+        self.assertEqual(payload["total_tokens"], 1_170_000_000)
+        self.assertEqual(payload["earned_badge"], "Wonder AI Kid")
+        self.assertIn("highest accepted provider total", payload["total_note"])
+        self.assertNotIn("discrepancy", payload["total_note"].lower())
 
     def test_start_parser_requires_explicit_provider(self) -> None:
         parser = cli.build_parser()

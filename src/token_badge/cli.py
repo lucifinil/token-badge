@@ -67,6 +67,27 @@ def _profile_repository_url(github_login: str) -> str:
     return f"https://github.com/{escaped_login}/{escaped_login}"
 
 
+def _profile_total_from_ranking(ranking: dict[str, Any], fallback: int) -> int:
+    total = ranking.get("total_tokens")
+    if isinstance(total, int) and not isinstance(total, bool):
+        return total
+    return fallback
+
+
+def _profile_total_note(provider: str, current_provider_total: int, profile_total: int) -> str:
+    if current_provider_total == profile_total:
+        return (
+            f"The badge and ranking use this {provider} total because it is the highest "
+            "accepted total for this GitHub profile."
+        )
+    return (
+        f"The current {provider} run reported {current_provider_total:,} tokens. "
+        f"The badge and ranking use {profile_total:,} tokens because that is the highest "
+        "accepted provider total for this GitHub profile across all uploaded agents. "
+        "This is expected when the same user has uploaded more than one provider."
+    )
+
+
 def _print_tier_standard() -> None:
     print("Tier standard:")
     for tier in DEFAULT_TIERS:
@@ -461,13 +482,19 @@ def run_start(args: argparse.Namespace, confirm=_prompt_yes_no) -> int:
         print(f"error: {exc}")
         return 1
 
-    earned = earned_tier(snapshot.total_tokens)
+    profile_total_tokens = _profile_total_from_ranking(ranking, snapshot.total_tokens)
+    earned = earned_tier(profile_total_tokens)
     public_profile_url = _public_profile_url(args.upload_url, github_login)
     profile_repository_url = _profile_repository_url(github_login)
+    total_note = _profile_total_note(snapshot.provider, snapshot.total_tokens, profile_total_tokens)
     summary = {
         "github_login": github_login,
         "provider": snapshot.provider,
-        "total_tokens": snapshot.total_tokens,
+        "current_provider_total_tokens": snapshot.total_tokens,
+        "profile_total_tokens": profile_total_tokens,
+        "total_tokens": profile_total_tokens,
+        "total_basis": "highest accepted provider total across uploaded agents for this GitHub profile",
+        "total_note": total_note,
         "earned_badge": None if earned is None else earned.name,
         "badge_tiers": _tier_rows(),
         "public_profile_url": public_profile_url,
@@ -478,7 +505,9 @@ def run_start(args: argparse.Namespace, confirm=_prompt_yes_no) -> int:
     if args.json:
         _print_json(summary)
     else:
-        print(f"Total consumption: {snapshot.total_tokens:,} tokens ({snapshot.provider})")
+        print(f"Total consumption for badge/ranking: {profile_total_tokens:,} tokens")
+        if profile_total_tokens != snapshot.total_tokens:
+            print(f"Current {snapshot.provider} run: {snapshot.total_tokens:,} tokens")
         print(f"Badge tier: {earned.name if earned else 'None yet'}")
         _print_tier_standard()
         print(f"Public page: {public_profile_url}")
@@ -486,6 +515,7 @@ def run_start(args: argparse.Namespace, confirm=_prompt_yes_no) -> int:
             "GitHub profile repo: "
             f"{profile_repository_url} (special README repo GitHub can show on @{github_login}'s profile)"
         )
+        print(total_note)
         print(ranking.get("message", ""))
 
     # --install-badge installs without prompting (for agents driving the flow);
