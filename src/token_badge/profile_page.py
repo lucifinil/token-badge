@@ -5,6 +5,8 @@ from typing import Any
 
 from token_badge.badges import TIER_COLORS
 
+PUBLIC_ORIGIN = "https://token-badge.vercel.app"
+
 _PAGE_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -48,7 +50,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   <div class="card">
     <div class="brand">Token Badge</div>
     <div class="badge-img">
-      <img src="/v1/badges/{login}.svg" alt="Token Badge: {tier_alt}">
+      <img id="badge-img" src="{public_origin}/v1/badges/{login}.svg" alt="Token Badge: {tier_alt}">
     </div>
     <div class="handle"><a href="https://github.com/{login}">@{login}</a></div>
     <div class="tier">{tier_line}</div>
@@ -68,13 +70,17 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
       This special GitHub repository controls the README that can appear on @{login}'s public profile.
     </div>
     <div class="foot">
-      {trust} · <a href="/v1/badges/{login}">raw badge data</a>
+      {trust} · <a id="raw-badge-link" href="{public_origin}/v1/badges/{login}">raw badge data</a>
     </div>
   </div>
   <script>
-    // Make the bootstrap statement host-aware regardless of domain (vercel.app or token-badge.ai).
+    const tokenBadgeOrigin = location.protocol === "file:" || location.origin === "null"
+      ? "{public_origin}"
+      : location.origin;
     document.getElementById("cta").textContent =
-      "Read " + location.origin + "/SKILL.md and follow the instructions to install Token Badge to get data for token consumption and badge.";
+      "Read " + tokenBadgeOrigin + "/SKILL.md and follow the instructions to install Token Badge to get data for token consumption and badge.";
+    document.getElementById("badge-img").src = tokenBadgeOrigin + "/v1/badges/{login}.svg";
+    document.getElementById("raw-badge-link").href = tokenBadgeOrigin + "/v1/badges/{login}";
   </script>
 </body>
 </html>
@@ -133,6 +139,7 @@ def render_profile_html(
         tier_alt=tier_alt,
         total_line=total_line,
         message=message,
+        public_origin=PUBLIC_ORIGIN,
         progress_pct=_progress_pct(total_tokens, next_threshold),
         next_line=next_line,
         trust=html.escape(str(badge_summary.get("trust_level") or "local-self-reported")),

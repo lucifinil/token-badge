@@ -4,6 +4,19 @@ Token Badge grants public profile badges for subscription-based AI agent token u
 The first provider target is Codex, using `ccusage codex monthly --json` as the local
 usage source.
 
+## Origin Story
+
+The idea started when I saw the enterprise version of Codex support codex-insight, so
+employees could check their token usage. That made me wonder what the same idea could
+look like for the wider consumer audience. Then I found `ccusage`, checked my own
+consumption, and immediately wanted to turn those totals into fun public tiers and
+badges.
+
+The tier names are a small football-memory salute. On Children's Day, with soccer
+season in the air and the 2026 World Cup around the corner, old Championship Manager 4 /
+03-04 memories came back. The badge ladder borrows the language of football talent:
+Hot AI Prospect, Wonder AI Kid, Key AI Player, and World-Class AI Player.
+
 ## Start From Your AI Agent
 
 Token Badge is a deployed service. Users do not run anything by hand — they give their
