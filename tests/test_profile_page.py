@@ -30,6 +30,9 @@ class ProfilePageRenderTest(unittest.TestCase):
         self.assertIn("https://github.com/lucifinil/lucifinil", page)
         self.assertIn("special GitHub repository", page)
         self.assertIn("install Token Badge to get data", page)
+        self.assertIn("https://token-badge.vercel.app/v1/badges/lucifinil.svg", page)
+        self.assertIn("tokenBadgeOrigin", page)
+        self.assertNotIn("file:///SKILL.md", page)
 
     def test_no_badge_page_renders_gracefully(self) -> None:
         summary = {
