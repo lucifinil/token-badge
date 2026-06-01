@@ -105,6 +105,28 @@ class APITest(unittest.TestCase):
         self.assertEqual(storage.snapshots[0]["raw_totals"]["totalTokens"], 100)
         self.assertNotIn("monthly", storage.snapshots[0])
 
+    def test_snapshot_endpoint_computes_report_hash_when_omitted(self) -> None:
+        storage = FakeStorage()
+        payload = valid_snapshot()
+        payload.pop("report_hash")
+
+        response = TokenBadgeAPI(storage).handle("POST", "/v1/usage-snapshots", payload)
+
+        self.assertEqual(response.status_code, 201)
+        stored = storage.snapshots[0]["report_hash"]
+        self.assertTrue(stored.startswith("sha256:"))
+
+    def test_snapshot_endpoint_accepts_upload_without_raw_totals(self) -> None:
+        storage = FakeStorage()
+        payload = valid_snapshot()
+        payload.pop("report_hash")
+        payload.pop("raw_totals")
+
+        response = TokenBadgeAPI(storage).handle("POST", "/v1/usage-snapshots", payload)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(storage.snapshots[0]["raw_totals"], {})
+
     def test_snapshot_endpoint_returns_json_when_storage_fails(self) -> None:
         response = TokenBadgeAPI(FailingStorage()).handle("POST", "/v1/usage-snapshots", valid_snapshot())
 
