@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import base64
+import html
 import json
 import os
 import subprocess
 from dataclasses import dataclass
 from typing import Protocol, Sequence
+from urllib.error import URLError
+from urllib.request import Request, urlopen
 
 
 START_MARKER = "<!-- token-badge:start -->"
@@ -57,6 +60,14 @@ class ProfileBadgeUpdate:
     repo_created: bool = False
 
 
+@dataclass(frozen=True)
+class ProfileVisibility:
+    profile_url: str
+    share_url: str
+    visible: bool | None
+    detail: str | None = None
+
+
 class GhCliRunner:
     def run(self, args: Sequence[str]) -> str:
         command = ["gh", *args]
@@ -77,6 +88,10 @@ def badge_markdown(github_login: str, badge_base_url: str) -> str:
     badge_url = f"{base_url}/v1/badges/{github_login}.svg"
     target_url = f"{base_url}/v1/badges/{github_login}"
     return f"[![Token Badge]({badge_url})]({target_url})"
+
+
+def badge_svg_url(github_login: str, badge_base_url: str) -> str:
+    return f"{badge_base_url.rstrip('/')}/v1/badges/{github_login}.svg"
 
 
 def badge_block(github_login: str, badge_base_url: str) -> str:
@@ -107,6 +122,47 @@ def upsert_badge_block(readme: str, block: str) -> tuple[str, bool]:
     separator = "\n\n" if readme and not readme.endswith("\n\n") else ""
     updated = f"{readme}{separator}{block}\n"
     return updated, True
+
+
+def _fetch_url(url: str) -> str:
+    request = Request(url, headers={"User-Agent": "token-badge-profile-check"})
+    with urlopen(request, timeout=10) as response:
+        return response.read().decode("utf-8", errors="replace")
+
+
+def profile_visibility_for_badge(
+    github_login: str,
+    badge_base_url: str,
+    *,
+    fetch_url=_fetch_url,
+) -> ProfileVisibility:
+    """Best-effort check that GitHub is rendering the badge on the public profile.
+
+    GitHub does not expose a documented API for the repository page's "Share to
+    Profile" button. This check keeps the supported flow honest: write the profile
+    README through the contents API, then detect whether the public profile page
+    actually includes the rendered badge URL.
+    """
+    profile_url = f"https://github.com/{github_login}"
+    share_url = f"https://github.com/{github_login}/{github_login}"
+    badge_url = badge_svg_url(github_login, badge_base_url)
+
+    try:
+        profile_html = fetch_url(profile_url)
+    except (OSError, URLError) as exc:
+        return ProfileVisibility(
+            profile_url=profile_url,
+            share_url=share_url,
+            visible=None,
+            detail=f"profile visibility could not be verified: {exc}",
+        )
+
+    escaped_badge_url = html.escape(badge_url, quote=True)
+    return ProfileVisibility(
+        profile_url=profile_url,
+        share_url=share_url,
+        visible=badge_url in profile_html or escaped_badge_url in profile_html,
+    )
 
 
 def _decode_readme_content(payload: dict[str, object]) -> ReadmeFile:

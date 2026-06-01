@@ -39,7 +39,12 @@ class FakeProfileClient:
 
     def install_badge(self, **kwargs: object):
         self.installed = True
-        return mock.Mock(changed=True, repository="octocat/octocat", repo_created=False)
+        return mock.Mock(
+            changed=True,
+            github_login="octocat",
+            repository="octocat/octocat",
+            repo_created=False,
+        )
 
 
 class StartFlowTest(unittest.TestCase):
@@ -72,6 +77,17 @@ class StartFlowTest(unittest.TestCase):
                 mock.patch.object(cli, "upload_usage_snapshot", return_value={"snapshot_id": "s1", "status": "accepted"})
             )
             stack.enter_context(mock.patch.object(cli, "fetch_ranking", return_value=self.ranking))
+            stack.enter_context(
+                mock.patch.object(
+                    cli,
+                    "profile_visibility_for_badge",
+                    return_value=cli.ProfileVisibility(
+                        profile_url="https://github.com/octocat",
+                        share_url="https://github.com/octocat/octocat",
+                        visible=True,
+                    ),
+                )
+            )
             yield
 
     def test_start_installs_badge_when_user_confirms(self) -> None:
