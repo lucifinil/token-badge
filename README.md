@@ -1,8 +1,26 @@
 # Token Badge
 
-Token Badge grants public profile badges for subscription-based AI agent token usage.
-The first provider target is Codex, using `ccusage codex monthly --json` as the local
-usage source.
+Token Badge grants public profile badges for AI agent token usage. The first provider
+target is Codex, using `ccusage codex monthly --json` as the local usage source.
+
+## What It Looks Like
+
+Each profile gets a shareable badge page at `https://token-badge.vercel.app/u/<login>`
+showing the earned tier, total consumption, and where it ranks against other AI adopters:
+
+<p align="center">
+  <img src="docs/assets/profile-page-example.png" alt="Example Token Badge profile page" width="380">
+</p>
+
+The badge itself is a live SVG you can drop into any profile, README, or site — it shows
+the highest tier the profile has earned:
+
+| Badge | Tier |
+| --- | --- |
+| ![Hot AI Prospect](docs/assets/badge-hot-ai-prospect.svg) | 100M+ tokens |
+| ![Wonder AI Kid](docs/assets/badge-wonder-ai-kid.svg) | 1B+ tokens |
+| ![Key AI Player](docs/assets/badge-key-ai-player.svg) | 10B+ tokens |
+| ![World-Class AI Player](docs/assets/badge-world-class-ai-player.svg) | 100B+ tokens |
 
 ## Origin Story
 
@@ -14,7 +32,7 @@ badges.
 
 On Children's Day 2026, with PSG having lifted the UEFA Champions League trophy the
 night before and the 2026 World Cup around the corner, this became a small
-football-memory salute too. I wanted to nod to my old-kid memories of CM4 / 03-04,
+soccer-memory salute too. I wanted to nod to my old-kid memories of CM4 / 03-04,
 where players were described by tiers and promise. That is where Hot AI Prospect,
 Wonder AI Kid, Key AI Player, and World-Class AI Player come from.
 
@@ -34,7 +52,7 @@ lives in [SKILL.md](SKILL.md).
 
 ## First Scope
 
-- Count subscription-based token consumption only.
+- Count AI coding-agent token consumption.
 - Start with Codex usage collected by `ccusage`.
 - Support Claude Code through the same local `ccusage` collection path.
 - Bind usage to a GitHub identity before granting a badge.
@@ -50,9 +68,9 @@ lives in [SKILL.md](SKILL.md).
 | 10,000,000,000 tokens | Key AI Player |
 | 100,000,000,000 tokens | World-Class AI Player |
 
-Tier names salute the old Championship Manager / Football Manager player-role ladder.
-The important invariant is that a public grant is based on the highest accepted
-provider total for the linked GitHub profile.
+Tier names salute the old soccer-management games (Championship Manager / Football
+Manager) player-role ladder. The important invariant is that a public grant is based on
+the highest accepted provider total for the linked GitHub profile.
 
 ## Consumption Percentile
 
@@ -78,40 +96,39 @@ where their consumption lands in the community:
   ```
 
 The percentile counts the share of *other* adopters whose highest accepted total is
-below yours. It is served from `GET /v1/rankings/<github-login>` and returned by the
-`start` quickstart described below.
+below yours. It is served from `GET /v1/rankings/<github-login>` and surfaced by the
+agent in the [Quickstart](#quickstart) flow below.
 
 ## Quickstart
 
-`start` is the one-statement entry point. It uploads your usage, prints your total
-consumption, badge tier, and percentile, then asks before touching your GitHub profile:
+There is nothing to install from the service. A user gives their coding agent the
+one-statement prompt in [Start From Your AI Agent](#start-from-your-ai-agent), and the
+agent — following [SKILL.md](SKILL.md) — does everything locally with `ccusage` and
+`curl`. No package download, no `uvx`, no clone; the agent already has `ccusage`,
+`curl`, and `gh`:
 
 ```bash
-uvx --from git+https://github.com/lucifinil/token-badge token-badge start \
-  --provider <codex|claude> \
-  --collector-id <collector-installation-id> \
-  --upload-url https://token-badge.vercel.app
+# 1. read local usage (the agent picks codex or claude based on which agent it is)
+TOTAL=$(ccusage <codex|claude> monthly --json | jq '.totals.totalTokens // ([.monthly[].totalTokens] | add)')
+
+# 2. get a one-time challenge, then upload — the service computes the integrity hash
+NONCE=$(curl -s -X POST https://token-badge.vercel.app/v1/challenges \
+  -H 'content-type: application/json' \
+  -d '{"collector_installation_id":"github:<node_id>","github_login":"<login>"}' | jq -r .challenge_nonce)
+
+curl -s -X POST https://token-badge.vercel.app/v1/usage-snapshots \
+  -H 'content-type: application/json' \
+  -d '{"challenge_nonce":"'"$NONCE"'","collector_installation_id":"github:<node_id>","github_login":"<login>","provider":"<codex|claude>","usage_kind":"subscription","trust_level":"local-self-reported","source":"ccusage <provider> monthly --json","total_tokens":'"$TOTAL"'}'
+
+# 3. see the result
+curl -s https://token-badge.vercel.app/v1/rankings/<login>
 ```
 
-`uvx` is still part of the current SaaS flow because token consumption is read from the
-user's local `ccusage` data, not from the hosted backend. It avoids asking users to
-clone this repository or run `python3 -m ...` from a checkout.
-
-If you answer yes at the prompt, `start` creates the special `<login>/<login>` profile
-repository when it does not exist yet and installs the badge in its README. If you
-answer no, nothing is written to GitHub — your usage is still recorded. Add `--json` to
-get the summary without the prompt.
-
-At the end of a successful `start` run, the user should see:
-
-- Total token consumption used for badge/ranking. If the current provider run is lower
-  because the same GitHub profile already uploaded another agent, the output explains
-  that the badge uses the highest accepted provider total.
-- Earned tier/badge plus the full tier standard.
-- Public Token Badge landing page, for example `https://token-badge.vercel.app/u/<login>`.
-- Special profile repository link, for example `https://github.com/<login>/<login>`.
-- If the profile repository was newly created, a reminder to click `Share to Profile`
-  in GitHub's UI if GitHub has not made it visible yet.
+The agent then reports the total consumption, earned tier, the percentile/early-adopter
+line, and the public badge page `https://token-badge.vercel.app/u/<login>`. If the same
+GitHub profile already uploaded another agent, the badge uses the highest accepted total
+across all of them. Only with the user's consent does the agent add the badge to their
+GitHub profile.
 
 ## MVP Flow
 
@@ -120,7 +137,7 @@ At the end of a successful `start` run, the user should see:
 2. Service issues a one-time collection challenge.
 3. Local collector runs `ccusage codex monthly --json`, computes the total, attaches
    the challenge, and signs a usage snapshot with the user's collector key.
-4. Service records the snapshot as Codex subscription usage.
+4. Service records the snapshot as Codex usage.
 5. Service grants the highest matching badge from the user's highest provider total and
    reports the user's consumption percentile against all other adopters.
 
@@ -130,8 +147,8 @@ export.
 
 ## Local Development
 
-These commands are for developing the collector from this checkout. SaaS users should
-use the agent-driven `uvx` flow above.
+These commands are for developing the collector from this checkout. End users do not
+need them — they use the agent-driven [SKILL.md](SKILL.md) flow above.
 
 Install local development dependencies:
 
