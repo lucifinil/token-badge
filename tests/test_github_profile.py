@@ -15,6 +15,7 @@ from token_badge.github_profile import (
     ProfileRepositoryNotFound,
     badge_block,
     badge_markdown,
+    profile_visibility_for_badge,
     upsert_badge_block,
 )
 
@@ -59,6 +60,26 @@ class GitHubProfileTest(unittest.TestCase):
             "[![Token Badge](https://token.example.com/v1/badges/octocat.svg)]"
             "(https://token.example.com/v1/badges/octocat)",
         )
+
+    def test_profile_visibility_detects_rendered_badge_url(self) -> None:
+        visibility = profile_visibility_for_badge(
+            "octocat",
+            "https://token.example.com",
+            fetch_url=lambda _url: '<img data-canonical-src="https://token.example.com/v1/badges/octocat.svg">',
+        )
+
+        self.assertTrue(visibility.visible)
+        self.assertEqual(visibility.profile_url, "https://github.com/octocat")
+        self.assertEqual(visibility.share_url, "https://github.com/octocat/octocat")
+
+    def test_profile_visibility_reports_missing_badge(self) -> None:
+        visibility = profile_visibility_for_badge(
+            "octocat",
+            "https://token.example.com",
+            fetch_url=lambda _url: "<html></html>",
+        )
+
+        self.assertFalse(visibility.visible)
 
     def test_upsert_appends_block_when_missing(self) -> None:
         updated, changed = upsert_badge_block("# Octocat\n", badge_block("octocat", "https://token.example.com"))

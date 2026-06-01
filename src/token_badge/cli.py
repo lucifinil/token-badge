@@ -9,7 +9,13 @@ from token_badge.ccusage import CcusageError, collect_provider_usage
 from token_badge.api import TokenBadgeAPI, run_http_server
 from token_badge.dependencies import collect_dependency_checks, required_checks_pass
 from token_badge.evidence import build_usage_evidence, evidence_summary
-from token_badge.github_profile import GitHubProfileClient, GitHubProfileError, badge_base_url_from_env
+from token_badge.github_profile import (
+    GitHubProfileClient,
+    GitHubProfileError,
+    ProfileVisibility,
+    badge_base_url_from_env,
+    profile_visibility_for_badge,
+)
 from token_badge.storage import StorageConfigurationError, StorageError, TiDBStorage
 from token_badge.tiers import DEFAULT_TIERS, earned_tier, next_tier
 from token_badge.upload import UploadError, fetch_ranking, request_challenge, upload_usage_snapshot
@@ -38,6 +44,25 @@ def _tier_payload(total_tokens: int) -> dict[str, Any]:
 
 def _print_json(payload: dict[str, Any]) -> None:
     print(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def _profile_visibility_payload(visibility: ProfileVisibility) -> dict[str, Any]:
+    return {
+        "profile_url": visibility.profile_url,
+        "share_url": visibility.share_url,
+        "visible": visibility.visible,
+        "detail": visibility.detail,
+    }
+
+
+def _print_profile_visibility(visibility: ProfileVisibility) -> None:
+    if visibility.visible is True:
+        print(f"Profile display: visible ({visibility.profile_url})")
+    elif visibility.visible is False:
+        print("Profile display: not visible yet")
+        print(f"Manual step: open {visibility.share_url} and click \"Share to Profile\".")
+    else:
+        print(f"Profile display: not verified ({visibility.detail})")
 
 
 def run_usage_provider(args: argparse.Namespace, provider: str) -> int:
@@ -153,6 +178,9 @@ def run_usage_provider(args: argparse.Namespace, provider: str) -> int:
             "repository": update.repository,
             "changed": update.changed,
             "commit_sha": update.commit_sha,
+            "visibility": _profile_visibility_payload(
+                profile_visibility_for_badge(update.github_login, badge_base_url)
+            ),
         }
 
     payload = {
@@ -192,6 +220,7 @@ def run_usage_provider(args: argparse.Namespace, provider: str) -> int:
     if profile_badge:
         action = "updated" if profile_badge["changed"] else "already up to date"
         print(f"Profile badge: {action} ({profile_badge['repository']})")
+        _print_profile_visibility(ProfileVisibility(**profile_badge["visibility"]))
     print(f"Earned badge: {earned['name'] if earned else 'None yet'}")
     if next_badge:
         print(
@@ -295,6 +324,10 @@ def run_profile_badge(args: argparse.Namespace) -> int:
         "dry_run": update.dry_run,
         "commit_sha": update.commit_sha,
     }
+    visibility = None
+    if not args.dry_run:
+        visibility = profile_visibility_for_badge(update.github_login, badge_base_url)
+        payload["visibility"] = _profile_visibility_payload(visibility)
     if args.dry_run:
         payload["readme"] = update.content
 
@@ -310,6 +343,8 @@ def run_profile_badge(args: argparse.Namespace) -> int:
     print(f"Profile README: {action}")
     if update.commit_sha:
         print(f"Commit: {update.commit_sha}")
+    if visibility:
+        _print_profile_visibility(visibility)
     return 0
 
 
@@ -449,6 +484,7 @@ def run_start(args: argparse.Namespace, confirm=_prompt_yes_no) -> int:
         print(f"Profile repository: created ({update.repository})")
     action = "updated" if update.changed else "already up to date"
     print(f"Profile badge: {action} ({update.repository})")
+    _print_profile_visibility(profile_visibility_for_badge(update.github_login, badge_base_url))
     return 0
 
 

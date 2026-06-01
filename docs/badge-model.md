@@ -87,6 +87,12 @@ backend.
 Collector commands can run this publication step immediately after an accepted upload
 with `--profile-badge`.
 
+GitHub may still show a repository page banner that asks the user to click `Share to
+Profile`. The public APIs expose repository creation and README writes, but not that
+final UI-only toggle. The CLI therefore performs a best-effort profile page visibility
+check after the README write and prints the profile repository URL when a manual click
+is still required.
+
 ## Visual Direction
 
 The MVP serves a self-hosted SVG badge because it works directly in GitHub READMEs and

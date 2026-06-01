@@ -197,6 +197,10 @@ Use `--dry-run` to preview the README content first. The command uses the existi
 GitHub connection through `gh`; if that connection is missing or lacks access, proceed
 with GitHub SSO/OAuth before retrying.
 
+After writing the README, the command performs a best-effort public profile visibility
+check. If GitHub has not started showing the special README yet, open the printed
+`https://github.com/<login>/<login>` URL and click `Share to Profile`.
+
 ## Repository Map
 
 - `src/token_badge/`: small collector and tiering prototype.
